@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<style>
+:root {
+  --bg: #f4f3ee;
+  --card: #fdfcf8;
+  --border: #d2cbbf;
+  --accent: #a65a2a;
+  --accent-glow: rgba(166,90,42,.2);
+  --text: #3a291d;
+  --muted: #9a7358;
+  --green: #2f855a;
+  --red: #dc2626;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  direction: rtl;
+}
+
+/* moving gradient background */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 20%, rgba(166,90,42,.06) 0%, transparent 62%),
+    radial-gradient(ellipse 50% 30% at 80% 80%, rgba(183,121,31,.08) 0%, transparent 64%);
+  pointer-events:none;
+}
+
+.login-wrap {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.logo-icon {
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, var(--accent), #8b451f);
+  border-radius: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  margin-bottom: 14px;
+  box-shadow: 0 0 30px var(--accent-glow);
+}
+
+.logo h1 {
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.logo p { font-size: 13px; color: var(--muted); }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 18px 34px rgba(22,44,36,.12);
+}
+
+.step { display: none; }
+.step.active { display: block; animation: fadeIn .3s ease; }
+
+@keyframes fadeIn { from {opacity:0;transform:translateY(8px)} to {opacity:1;transform:translateY(0)} }
+
+.step-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.step-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.field { margin-bottom: 16px; }
+
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 8px;
+  letter-spacing: .5px;
+}
+
+.field input {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 16px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 15px;
+  outline: none;
+  direction: rtl;
+  transition: border-color .2s;
+}
+
+.field input:focus { border-color: var(--accent); }
+.field input::placeholder { color: var(--muted); }
+
+.password-wrap {
+  position: relative;
+}
+
+.password-wrap input {
+  padding-left: 46px;
+}
+
+.pass-toggle {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px;
+}
+
+.pass-toggle:hover {
+  color: var(--text);
+}
+
+.pass-toggle svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--accent), #8b451f);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-family: 'Cairo', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+  margin-top: 8px;
+}
+
+.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow); }
+.btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+.btn.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.btn.secondary:hover {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.text-btn:hover { text-decoration: underline; }
+
+.forgot-box {
+  display: none;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+.forgot-box.show {
+  display: block;
+  animation: fadeIn .2s ease;
+}
+
+/* OTP inputs */
+.otp-wrap {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+  direction: ltr;
+}
+
+.otp-input {
+  width: 52px; height: 60px;
+  background: #0a0c12;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  outline: none;
+  transition: border-color .2s;
+}
+
+.otp-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.otp-input.filled { border-color: var(--accent); }
+
+.timer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.timer span { color: var(--accent); font-weight: 700; }
+
+.resend-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  display: none;
+  width: 100%;
+  text-align: center;
+  padding: 8px;
+  font-weight: 600;
+}
+
+.resend-btn.show { display: block; }
+
+.error-msg {
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--red);
+  margin-bottom: 16px;
+  display: none;
+}
+
+.error-msg.show { display: block; animation: fadeIn .2s; }
+
+.error-msg.success {
+  background: rgba(34,197,94,.1);
+  border: 1px solid rgba(34,197,94,.3);
+  color: var(--green);
+}
+
+.progress-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all .3s;
+}
+
+.dot.active { background: var(--accent); width: 20px; border-radius: 4px; }
+.dot.done   { background: var(--green); }
+
+@media (max-width:640px){
+  body{align-items:flex-start;padding:14px}
+  .login-wrap{max-width:100%;padding:0}
+  .logo{margin-bottom:18px}
+  .logo h1{font-size:20px}
+  .logo p{font-size:12px}
+  .card{border-radius:14px;padding:18px 14px}
+  .step-title{font-size:16px}
+  .step-sub{font-size:12px;margin-bottom:16px}
+  .field input{font-size:14px;padding:11px 12px}
+  .btn{font-size:14px;padding:12px}
+  .otp-wrap{gap:6px;margin-bottom:16px}
+  .otp-input{width:42px;height:50px;font-size:20px;border-radius:10px}
+  .progress-dots{margin-bottom:16px}
+}
+
+@media (max-width:380px){
+  .otp-input{width:36px;height:46px;font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+
+  <div class="logo">
+    <h1>نجم</h1>
+    <p>by نجوم العمران </p>
+  </div>
+
+  <div class="card">
+
+    <!-- Progress -->
+    <div class="progress-dots">
+      <div class="dot active" id="dot-1"></div>
+      <div class="dot" id="dot-2"></div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-msg" id="error-msg"></div>
+
+    <!-- STEP 1: Email + Password -->
+    <div class="step active" id="step-1">
+      <div class="step-title">مرحباً بك 👋</div>
+      <div class="step-sub">أدخل بياناتك للمتابعة</div>
+
+      <div class="field">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="email" placeholder="example@company.com">
+      </div>
+
+      <div class="field">
+        <label>كلمة المرور</label>
+        <div class="password-wrap">
+          <input type="password" id="password" placeholder="••••••••"
+                 onkeydown="if(event.key==='Enter') submitLogin()">
+          <button type="button" class="pass-toggle" onclick="togglePassword('password', this)" aria-label="إظهار كلمة المرور" title="إظهار كلمة المرور">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1.5 12s3.8-6.5 10.5-6.5S22.5 12 22.5 12s-3.8 6.5-10.5 6.5S1.5 12 1.5 12Z"/>
+              <circle cx="12" cy="12" r="3.2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn" onclick="submitLogin()" id="login-btn">
+        <i class="fa-solid fa-arrow-left-long"></i> متابعة
+      </button>
+
+      <button class="text-btn" type="button" onclick="toggleForgotPassword()" id="forgot-toggle-btn">
+        نسيت كلمة المرور؟
+      </button>
+
+      <div class="forgot-box" id="forgot-box">
+        <div class="step-sub" id="forgot-sub" style="margin-bottom:14px;">
+          أدخل بريدك أولاً للتأكد من وجوده في النظام
+        </div>
+
+        <div class="field">
+          <label>البريد الإلكتروني</label>
+          <input type="email" id="fp-email" placeholder="example@company.com">
+        </div>
+
+        <button class="btn secondary" type="button" onclick="verifyResetEmail()" id="fp-check-btn">
+          تحقق من البريد
+        </button>
+
+        <div id="fp-reset-box" style="display:none; margin-top:14px;">
+          <div class="field">
+            <label>كلمة المرور الجديدة</label>
+            <div class="password-wrap">
+              <input type="password" id="fp-pass1" placeholder="••••••••">
+              <button type="button" class="pass-toggle" onclick="togglePassword('fp-pass1', this)" aria-label="إظهار كلمة المرور" title="إظهار كلمة المرور">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1.5 12s3.8-6.5 10.5-6.5S22.5 12 22.5 12s-3.8 6.5-10.5 6.5S1.5 12 1.5 12Z"/>
+                  <circle cx="12" cy="12" r="3.2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>تأكيد كلمة المرور</label>
+            <div class="password-wrap">
+              <input type="password" id="fp-pass2" placeholder="••••••••" onkeydown="if(event.key==='Enter') submitForgotPassword()">
+              <button type="button" class="pass-toggle" onclick="togglePassword('fp-pass2', this)" aria-label="إظهار كلمة المرور" title="إظهار كلمة المرور">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1.5 12s3.8-6.5 10.5-6.5S22.5 12 22.5 12s-3.8 6.5-10.5 6.5S1.5 12 1.5 12Z"/>
+                  <circle cx="12" cy="12" r="3.2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn" type="button" onclick="submitForgotPassword()" id="fp-reset-btn">
+            تغيير كلمة المرور
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: OTP -->
+    <div class="step" id="step-2">
+      <div class="step-title"><i class="fa-solid fa-shield-halved"></i> التحقق من الهوية</div>
+      <div class="step-sub" id="otp-sub">
+        تم إرسال كود التحقق إلى هاتفك<br>
+        <strong>صالح لمدة دقيقة واحدة فقط</strong>
+      </div>
+
+      <div class="otp-wrap">
+        <input class="otp-input" maxlength="1" id="otp-0" oninput="otpInput(0)" onkeydown="otpKey(event,0)">
+        <input class="otp-input" maxlength="1" id="otp-1" oninput="otpInput(1)" onkeydown="otpKey(event,1)">
+        <input class="otp-input" maxlength="1" id="otp-2" oninput="otpInput(2)" onkeydown="otpKey(event,2)">
+        <input class="otp-input" maxlength="1" id="otp-3" oninput="otpInput(3)" onkeydown="otpKey(event,3)">
+        <input class="otp-input" maxlength="1" id="otp-4" oninput="otpInput(4)" onkeydown="otpKey(event,4)">
+        <input class="otp-input" maxlength="1" id="otp-5" oninput="otpInput(5)" onkeydown="otpKey(event,5)">
+      </div>
+
+      <div class="timer">ينتهي خلال <span id="timer-count">60</span> ثانية</div>
+      <button class="resend-btn" id="resend-btn" onclick="resendOtp()">إعادة إرسال الكود</button>
+
+      <button class="btn" onclick="submitOtp()" id="otp-btn">
+        <i class="fa-solid fa-check"></i> تحقق وادخل
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let timerInterval;
+let pendingEmail = '';
+let resetEmailVerified = false;
+
+const EYE_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M1.5 12s3.8-6.5 10.5-6.5S22.5 12 22.5 12s-3.8 6.5-10.5 6.5S1.5 12 1.5 12Z"/>
+    <circle cx="12" cy="12" r="3.2"/>
+  </svg>
+`;
+
+const EYE_OFF_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M3 3l18 18"/>
+    <path d="M10.6 6.1A11 11 0 0 1 12 6c6.7 0 10.5 6 10.5 6a18.6 18.6 0 0 1-4 4.7"/>
+    <path d="M6.1 6.1A18.2 18.2 0 0 0 1.5 12S5.3 18.5 12 18.5c1.7 0 3.2-.4 4.5-1.1"/>
+    <path d="M9.9 9.9a3.2 3.2 0 0 0 4.2 4.2"/>
+  </svg>
+`;
+
+function togglePassword(inputId, btnEl) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btnEl.innerHTML = show ? EYE_OFF_ICON : EYE_ICON;
+  btnEl.setAttribute('aria-label', show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور');
+  btnEl.setAttribute('title', show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور');
+}
+
+function resetForgotState() {
+  resetEmailVerified = false;
+  document.getElementById('fp-reset-box').style.display = 'none';
+  document.getElementById('forgot-sub').textContent = 'أدخل بريدك أولاً للتأكد من وجوده في النظام';
+  document.getElementById('fp-pass1').value = '';
+  document.getElementById('fp-pass2').value = '';
+}
+
+function toggleForgotPassword() {
+  const box = document.getElementById('forgot-box');
+  const btn = document.getElementById('forgot-toggle-btn');
+  const isOpen = box.classList.toggle('show');
+
+  if (isOpen) {
+    btn.textContent = 'إلغاء نسيت كلمة المرور';
+    document.getElementById('fp-email').focus();
+  } else {
+    btn.textContent = 'نسيت كلمة المرور؟';
+    resetForgotState();
+  }
+
+  hideError();
+}
+
+async function verifyResetEmail() {
+  const email = document.getElementById('fp-email').value.trim().toLowerCase();
+  const btn = document.getElementById('fp-check-btn');
+
+  if (!email) return showError('أدخل البريد الإلكتروني');
+
+  btn.disabled = true;
+  btn.textContent = 'جارٍ التحقق...';
+  hideError();
+
+  try {
+    const res = await fetch('/api/forgot-password/check-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json();
+    if (!data.success) return showError(data.error || 'تعذر التحقق من البريد');
+
+    resetEmailVerified = true;
+    document.getElementById('forgot-sub').textContent = 'تم التحقق من البريد — أدخل كلمة المرور الجديدة';
+    document.getElementById('fp-reset-box').style.display = 'block';
+    document.getElementById('fp-pass1').focus();
+  } catch (e) {
+    showError('تعذر الاتصال بالخادم');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'تحقق من البريد';
+  }
+}
+
+async function submitForgotPassword() {
+  const newPass = document.getElementById('fp-pass1').value;
+  const confirm = document.getElementById('fp-pass2').value;
+  const btn = document.getElementById('fp-reset-btn');
+
+  if (!resetEmailVerified) return showError('تحقق من البريد أولاً');
+  if (newPass.length < 8) return showError('الباسورد يجب أن يكون 8 أحرف على الأقل');
+  if (newPass !== confirm) return showError('تأكيد كلمة المرور غير متطابق');
+
+  btn.disabled = true;
+  btn.textContent = 'جارٍ التحديث...';
+  hideError();
+
+  try {
+    const res = await fetch('/api/forgot-password/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_password: newPass })
+    });
+
+    const data = await res.json();
+    if (!data.success) return showError(data.error || 'تعذر تغيير كلمة المرور');
+
+    document.getElementById('email').value = document.getElementById('fp-email').value.trim();
+    document.getElementById('password').value = '';
+    document.getElementById('forgot-box').classList.remove('show');
+    document.getElementById('forgot-toggle-btn').textContent = 'نسيت كلمة المرور؟';
+    resetForgotState();
+    showSuccess('تم تغيير كلمة المرور بنجاح، يمكنك تسجيل الدخول الآن');
+    document.getElementById('password').focus();
+  } catch (e) {
+    showError('تعذر الاتصال بالخادم');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'تغيير كلمة المرور';
+  }
+}
+
+// ── STEP 1
+async function submitLogin() {
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn      = document.getElementById('login-btn');
+
+  if (!email || !password) return showError('أدخل البريد وكلمة المرور');
+
+  btn.disabled = true;
+  btn.textContent = 'جارٍ التحقق...';
+  hideError();
+
+  const res = await fetch('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+
+  const data = await res.json();
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-arrow-left-long"></i> متابعة';
+
+  if (!data.success) return showError(data.error);
+
+  pendingEmail = email;
+  goStep2();
+}
+
+// ── STEP 2
+function goStep2() {
+  document.getElementById('step-1').classList.remove('active');
+  document.getElementById('step-2').classList.add('active');
+  document.getElementById('dot-1').classList.remove('active');
+  document.getElementById('dot-1').classList.add('done');
+  document.getElementById('dot-2').classList.add('active');
+  startTimer();
+  setTimeout(() => document.getElementById('otp-0').focus(), 100);
+}
+
+function startTimer() {
+  let sec = 60;
+  document.getElementById('timer-count').textContent = sec;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    sec--;
+    document.getElementById('timer-count').textContent = sec;
+    if (sec <= 0) {
+      clearInterval(timerInterval);
+      document.getElementById('resend-btn').classList.add('show');
+      document.getElementById('timer-count').parentElement.style.display = 'none';
+    }
+  }, 1000);
+}
+
+async function resendOtp() {
+  await submitLogin();
+  document.getElementById('resend-btn').classList.remove('show');
+  document.getElementById('timer-count').parentElement.style.display = '';
+  startTimer();
+  for (let i=0;i<6;i++) {
+    const el = document.getElementById(`otp-${i}`);
+    el.value = '';
+    el.classList.remove('filled');
+  }
+  document.getElementById('otp-0').focus();
+}
+
+// ── OTP inputs
+function otpInput(idx) {
+  const el = document.getElementById(`otp-${idx}`);
+  el.value = el.value.replace(/\D/g, '');
+  if (el.value.length === 1) {
+    el.classList.add('filled');
+    if (idx < 5) document.getElementById(`otp-${idx+1}`).focus();
+    else submitOtp();
+  }
+}
+
+function otpKey(e, idx) {
+  if (e.key === 'Backspace') {
+    const el = document.getElementById(`otp-${idx}`);
+    if (!el.value && idx > 0) {
+      document.getElementById(`otp-${idx-1}`).value = '';
+      document.getElementById(`otp-${idx-1}`).classList.remove('filled');
+      document.getElementById(`otp-${idx-1}`).focus();
+    }
+    el.classList.remove('filled');
+  }
+}
+
+async function submitOtp() {
+  const code = Array.from({length:6}, (_,i) => document.getElementById(`otp-${i}`).value).join('');
+  if (code.length < 6) return showError('أدخل الكود كاملاً');
+
+  const btn = document.getElementById('otp-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارٍ التحقق...';
+  hideError();
+
+  const res = await fetch('/verify-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+
+  const data = await res.json();
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-check"></i> تحقق وادخل';
+
+  if (!data.success) {
+    showError(data.error);
+    for (let i=0;i<6;i++) {
+      document.getElementById(`otp-${i}`).value='';
+      document.getElementById(`otp-${i}`).classList.remove('filled');
+    }
+    document.getElementById('otp-0').focus();
+    return;
+  }
+
+  clearInterval(timerInterval);
+  window.location.href = data.redirect;
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.classList.remove('success');
+  el.classList.add('show');
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.classList.add('show', 'success');
+}
+
+function hideError() {
+  document.getElementById('error-msg').classList.remove('show', 'success');
+}
+</script>
+</body>
+</html>

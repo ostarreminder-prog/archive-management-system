@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}سجل النشاط{% endblock %}
+{% block page_title %}سجل النشاط{% endblock %}
+{% block page_sub %}متابعة كل العمليات والدخول في النظام{% endblock %}
+
+{% block extra_css %}
+<style>
+.log-tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;width:fit-content;margin-bottom:16px}
+.log-tab{padding:8px 20px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text3);transition:all .2s;border:none;background:none;font-family:'IBM Plex Sans Arabic',sans-serif}
+.log-tab.active{background:var(--accent-dim);color:var(--accent)}
+
+.log-filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.log-filters input,.log-filters select{background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:8px 12px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:12px;outline:none}
+.log-filters input{flex:1;min-width:180px;direction:rtl}
+.log-filters input:focus,.log-filters select:focus{border-color:var(--accent)}
+
+/* Log Row */
+.log-row{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .15s}
+.log-row:hover{background:rgba(255,255,255,.02)}
+.log-row:last-child{border-bottom:none}
+.log-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;margin-top:2px}
+.log-body{flex:1;min-width:0}
+.log-action{font-size:13px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.log-detail{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-right{text-align:left;flex-shrink:0}
+.log-time{font-size:10px;color:var(--text3);direction:ltr;white-space:nowrap}
+.log-device{font-size:10px;color:var(--text3);margin-top:2px;direction:ltr}
+
+/* Login row */
+.login-row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);transition:background .15s}
+.login-row:hover{background:rgba(255,255,255,.02)}
+.login-row:last-child{border-bottom:none}
+.event-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* stats bar */
+.log-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.log-stat{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center}
+.log-stat-val{font-size:20px;font-weight:700;margin-bottom:2px}
+.log-stat-lbl{font-size:10px;color:var(--text3)}
+
+/* live indicator */
+.live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:6px;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.empty-log{text-align:center;padding:40px;color:var(--text3)}
+
+@media (max-width:760px){
+  .log-stats{grid-template-columns:repeat(2,1fr)}
+  .log-tabs{width:100%;overflow-x:auto;white-space:nowrap}
+  .log-tab{flex-shrink:0;padding:8px 14px}
+  .log-filters > *{width:100%}
+  .log-row,.login-row{padding:10px 12px}
+  .log-right{text-align:right}
+}
+
+@media (max-width:520px){
+  .log-stats{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- إحصائيات سريعة -->
+<div class="log-stats" id="log-stats">
+  <div class="log-stat"><div class="log-stat-val" id="ls-logins" style="color:var(--accent)">—</div><div class="log-stat-lbl">دخول اليوم</div></div>
+  <div class="log-stat"><div class="log-stat-val" id="ls-actions" style="color:var(--gold)">—</div><div class="log-stat-lbl">عملية اليوم</div></div>
+  <div class="log-stat"><div class="log-stat-val" id="ls-fails" style="color:var(--red)">—</div><div class="log-stat-lbl">محاولة فاشلة</div></div>
+  <div class="log-stat"><div class="log-stat-val" id="ls-devices" style="color:var(--purple)">—</div><div class="log-stat-lbl">جهاز جديد</div></div>
+</div>
+
+<!-- Tabs -->
+<div class="log-tabs">
+  <button class="log-tab active" onclick="showTab('activity',this)"><i class="fa-solid fa-clipboard-list"></i> سجل النشاط <span class="live-dot"></span></button>
+  <button class="log-tab" onclick="showTab('logins',this)"><i class="fa-solid fa-right-to-bracket"></i> سجل الدخول</button>
+</div>
+
+<!-- فلاتر مشتركة -->
+<div class="log-filters">
+  <input id="log-search" placeholder="بحث بالاسم أو الإجراء..." oninput="applyFilter()">
+  <select id="log-user" onchange="applyFilter()">
+    <option value="">كل المستخدمين</option>
+  </select>
+  <select id="log-action-filter" onchange="applyFilter()" id="action-filter">
+    <option value="">كل الإجراءات</option>
+    <option value="LOGIN">دخول</option>
+    <option value="LOGOUT">خروج</option>
+    <option value="CREATE_USER">إنشاء مستخدم</option>
+    <option value="CREATE_DOC">إنشاء وثيقة</option>
+    <option value="SIGNED">توقيع</option>
+    <option value="SIGNED_PDF">توقيع PDF</option>
+    <option value="APPROVE_DOC">اعتماد</option>
+    <option value="REJECT_DOC">رفض</option>
+    <option value="DEVICE_TRUSTED">جهاز موثوق</option>
+    <option value="ACCOUNT_BLOCKED">حساب مجمّد</option>
+  </select>
+  <button class="btn-ghost" onclick="refresh()" style="flex-shrink:0"><i class="fa-solid fa-rotate"></i> تحديث</button>
+</div>
+
+<!-- سجل النشاط -->
+<div id="tab-activity">
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="table-title"><i class="fa-solid fa-clipboard-list"></i> سجل العمليات</div>
+      <div id="activity-count" style="font-size:11px;color:var(--text3)"></div>
+    </div>
+    <div id="activity-list">
+      <div class="empty-log"><i class="fa-solid fa-hourglass-half"></i> جارٍ التحميل...</div>
+    </div>
+  </div>
+</div>
+
+<!-- سجل الدخول -->
+<div id="tab-logins" style="display:none">
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="table-title"><i class="fa-solid fa-right-to-bracket"></i> سجل الدخول والخروج</div>
+      <div id="logins-count" style="font-size:11px;color:var(--text3)"></div>
+    </div>
+    <div id="logins-list">
+      <div class="empty-log"><i class="fa-solid fa-hourglass-half"></i> جارٍ التحميل...</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentTab = 'activity';
+let activityData = [];
+let loginsData   = [];
+let allUsers     = [];
+
+const actionIcons = {
+  LOGIN:'<i class="fa-solid fa-circle-check"></i>', LOGOUT:'<i class="fa-solid fa-right-from-bracket"></i>', CHANGE_PASSWORD:'<i class="fa-solid fa-key"></i>',
+  CREATE_USER:'<i class="fa-solid fa-user-plus"></i>', DELETE_USER:'<i class="fa-solid fa-trash"></i>',
+  CREATE_DOC:'<i class="fa-solid fa-file-circle-plus"></i>', APPROVE_DOC:'<i class="fa-solid fa-circle-check"></i>', REJECT_DOC:'<i class="fa-solid fa-circle-xmark"></i>',
+  SIGNED:'<i class="fa-solid fa-signature"></i>', SIGNED_PDF:'<i class="fa-solid fa-signature"></i>',
+  UPLOAD_SIGNATURE:'<i class="fa-solid fa-pen-nib"></i>', SET_SIGN_PASSWORD:'<i class="fa-solid fa-lock"></i>',
+  DEVICE_TRUSTED:'<i class="fa-solid fa-computer"></i>', ACCOUNT_BLOCKED:'<i class="fa-solid fa-lock"></i>',
+};
+const actionColors = {
+  LOGIN:'var(--green)', LOGOUT:'var(--text3)',
+  CREATE_USER:'var(--accent)', DELETE_USER:'var(--red)',
+  CREATE_DOC:'var(--accent)', APPROVE_DOC:'var(--green)', REJECT_DOC:'var(--red)',
+  SIGNED:'var(--gold)', SIGNED_PDF:'var(--gold)',
+  DEVICE_TRUSTED:'var(--purple)', ACCOUNT_BLOCKED:'var(--red)',
+};
+const eventColors = {
+  login:'var(--green)', logout:'var(--text3)',
+  failed:'var(--red)', otp_fail:'var(--red)',
+  otp_sent:'var(--accent)', new_device:'var(--gold)',
+};
+const eventLabels = {
+  login:'دخول ناجح', logout:'خروج',
+  failed:'كلمة مرور خاطئة', otp_fail:'كود OTP خاطئ',
+  otp_sent:'إرسال OTP', new_device:'جهاز جديد',
+};
+
+async function loadData(){
+  const [ar, lg, users] = await Promise.all([
+    fetch('/api/admin/activity').then(r=>r.json()),
+    fetch('/api/admin/logins').then(r=>r.json()),
+    fetch('/api/users').then(r=>r.json()),
+  ]);
+
+  activityData = ar.logs   || [];
+  loginsData   = lg.logs   || [];
+  allUsers     = users;
+
+  // stats
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('ls-logins').textContent  = loginsData.filter(l=>l.event==='login'      && (l.timestamp||'').startsWith(today)).length;
+  document.getElementById('ls-actions').textContent = activityData.filter(l=>(l.timestamp||'').startsWith(today)).length;
+  document.getElementById('ls-fails').textContent   = loginsData.filter(l=>['failed','otp_fail'].includes(l.event) && (l.timestamp||'').startsWith(today)).length;
+  document.getElementById('ls-devices').textContent = loginsData.filter(l=>l.event==='new_device'  && (l.timestamp||'').startsWith(today)).length;
+
+  // populate user filter
+  const sel = document.getElementById('log-user');
+  allUsers.forEach(u=>{ const o=document.createElement('option'); o.value=u.id; o.textContent=u.name; sel.appendChild(o); });
+
+  applyFilter();
+}
+
+function applyFilter(){
+  const q      = document.getElementById('log-search').value.toLowerCase();
+  const uid    = document.getElementById('log-user').value;
+  const action = document.getElementById('log-action-filter').value;
+
+  if(currentTab === 'activity'){
+    const list = activityData.filter(l=>
+      (!q      || (l.user_name||'').toLowerCase().includes(q) || (l.action||'').toLowerCase().includes(q) || (l.details||'').toLowerCase().includes(q)) &&
+      (!uid    || String(l.user_id)===uid) &&
+      (!action || l.action===action)
+    );
+    renderActivity(list);
+  } else {
+    const list = loginsData.filter(l=>
+      (!q   || (l.user_name||'').toLowerCase().includes(q) || (l.event||'').toLowerCase().includes(q)) &&
+      (!uid || String(l.user_id)===uid)
+    );
+    renderLogins(list);
+  }
+}
+
+function renderActivity(logs){
+  const el = document.getElementById('activity-list');
+  document.getElementById('activity-count').textContent = `${logs.length} سجل`;
+  if(!logs.length){el.innerHTML='<div class="empty-log"><i class="fa-solid fa-magnifying-glass"></i> لا توجد نتائج</div>';return;}
+  el.innerHTML = logs.map(l=>{
+    const ic    = actionIcons[l.action]  || '<i class="fa-solid fa-gear"></i>';
+    const color = actionColors[l.action] || 'var(--text2)';
+    const bg    = color.replace('var(--','rgba(').replace(')',',0.12)').replace('rgba(--','rgba(');
+    const initials = (l.user_name||'?')[0];
+    return `<div class="log-row">
+      <div class="log-av" style="background:linear-gradient(135deg,var(--accent),#b7791f)">${initials}</div>
+      <div class="log-body">
+        <div class="log-action">
+          <span style="font-size:15px">${ic}</span>
+          <span style="color:${color}">${l.action||'—'}</span>
+          <span style="color:var(--text2);font-weight:400;font-size:12px">— ${l.user_name||'مجهول'}</span>
+        </div>
+        <div class="log-detail">${l.details||'—'}</div>
+      </div>
+      <div class="log-right">
+        <div class="log-time">${(l.timestamp||'').slice(0,16).replace('T',' ')}</div>
+        <div class="log-device">${l.device_type||''} ${l.os_name||''} ${l.ip_address?'• '+l.ip_address:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLogins(logs){
+  const el = document.getElementById('logins-list');
+  document.getElementById('logins-count').textContent = `${logs.length} سجل`;
+  if(!logs.length){el.innerHTML='<div class="empty-log"><i class="fa-solid fa-magnifying-glass"></i> لا توجد نتائج</div>';return;}
+  el.innerHTML = logs.map(l=>{
+    const color = eventColors[l.event] || 'var(--text3)';
+    const label = eventLabels[l.event] || l.event;
+    return `<div class="login-row">
+      <div class="event-dot" style="background:${color}"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">
+          <span style="color:${color}">${label}</span>
+          <span style="color:var(--text2);font-weight:400;font-size:12px"> — ${l.user_name||'مجهول'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${l.device_type||''} ${l.os_name||''} — ${l.browser||''}</div>
+      </div>
+      <div style="text-align:left;flex-shrink:0">
+        <div class="log-time">${(l.timestamp||'').slice(0,16).replace('T',' ')}</div>
+        <div class="log-device" style="margin-top:2px">${l.ip_address||''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showTab(tab, btn){
+  currentTab = tab;
+  document.querySelectorAll('.log-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-activity').style.display = tab==='activity'?'':'none';
+  document.getElementById('tab-logins').style.display   = tab==='logins'  ?'':'none';
+  applyFilter();
+}
+
+function refresh(){ loadData(); toast('تم التحديث'); }
+
+// تحديث تلقائي كل 30 ثانية
+setInterval(loadData, 30000);
+loadData();
+</script>
+{% endblock %}

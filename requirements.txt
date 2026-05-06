@@ -1,0 +1,13 @@
+﻿flask
+gunicorn
+pillow
+reportlab
+pypdf
+arabic-reshaper
+python-bidi
+python-docx
+paramiko
+qrcode
+werkzeug
+python-dotenv
+pypdfium2

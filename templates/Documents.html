@@ -1,0 +1,1736 @@
+{% extends "base.html" %}
+{% block title %}الوثائق{% endblock %}
+{% block page_title %}الوثائق{% endblock %}
+{% block page_sub %}رفع وإدارة الوثائق الرسمية{% endblock %}
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openNewDocModal()"><i class="fa-solid fa-plus"></i> وثيقة جديدة</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px}
+.doc-card{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:18px;transition:all .2s;cursor:pointer;position:relative;overflow:hidden}
+.doc-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.doc-card::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;background:var(--doc-c,var(--accent));border-radius:0 14px 0 60px;opacity:.05}
+.doc-thumb{height:130px;background:var(--card2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.doc-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.doc-thumb-pdf{width:100%;height:100%;border:none;background:#fff}
+.doc-thumb-fallback{font-size:30px;color:var(--text3)}
+.doc-icon{font-size:28px;margin-bottom:12px}
+.doc-title{font-size:14px;font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-archive{font-size:10px;color:var(--text3);margin-bottom:10px;font-family:monospace;direction:ltr;text-align:right}
+.doc-footer{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.doc-date{font-size:10px;color:var(--text3)}
+.doc-actions{display:flex;gap:6px;opacity:0;transition:opacity .2s}
+.doc-card:hover .doc-actions{opacity:1}
+.doc-need-approve{margin-bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#facc15;font-size:10px;font-weight:700}
+.doc-card.needs-sign{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
+.doc-card.needs-sign .doc-title{color:var(--accent)}
+.doc-need-sign{margin-bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:var(--accent);border:1px solid var(--accent);color:var(--bg);font-size:10px;font-weight:800}
+
+/* Approval queue */
+.approval-queue{background:var(--card);border:1px solid rgba(245,158,11,.35);border-radius:14px;padding:14px 16px;margin-bottom:16px}
+.approval-queue-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.approval-queue-title{font-size:13px;font-weight:700;color:#facc15}
+.approval-queue-count{font-size:11px;color:var(--text2)}
+.approval-queue-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.approval-queue-item{background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;text-align:right;cursor:pointer;transition:all .2s}
+.approval-queue-item:hover{border-color:#facc15;transform:translateY(-1px)}
+.approval-queue-item-title{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.approval-queue-item-meta{font-size:10px;color:var(--text3);margin-top:3px;display:flex;justify-content:space-between;gap:8px}
+
+.list-need-approve{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:5px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#facc15;font-size:10px;font-weight:700;margin-right:6px}
+.list-need-sign{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:5px;background:var(--accent);border:1px solid var(--accent);color:var(--bg);font-size:10px;font-weight:800;margin-right:6px}
+.row-needs-sign{background:var(--accent-dim)}
+
+/* Upload Zone */
+.upload-zone{border:2px dashed var(--border2);border-radius:14px;padding:40px 24px;text-align:center;cursor:pointer;transition:all .3s;background:var(--card)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-dim)}
+.upload-zone-icon{font-size:40px;margin-bottom:12px}
+.upload-zone-text{font-size:14px;font-weight:600;margin-bottom:4px}
+.upload-zone-sub{font-size:12px;color:var(--text3)}
+
+/* Text editor */
+.text-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:8px;background:var(--card2);border:1px solid var(--border2);border-radius:10px}
+.text-toolbar label{font-size:11px;color:var(--text3)}
+.text-toolbar select,.text-toolbar input[type="color"]{background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;padding:6px 8px;font-size:12px;outline:none}
+.text-style-btn{background:var(--accent-dim);border:1px solid rgba(166,90,42,.25);color:var(--accent);border-radius:8px;padding:6px 10px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:12px;cursor:pointer}
+.text-style-btn:hover{filter:brightness(1.08)}
+.rich-editor{min-height:140px;max-height:220px;overflow:auto;background:#ffffff;border:1.5px solid var(--border2);border-radius:9px;padding:11px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:16px;line-height:1.9;outline:none;direction:rtl;white-space:pre-wrap}
+.rich-editor:empty:before{content:attr(data-placeholder);color:var(--text3)}
+.rich-editor.template-mode{background:#ffffff;color:#000000;border-color:#e5e7eb}
+.rich-editor.template-mode:empty:before{color:#334155}
+
+/* New doc modal sizing */
+#new-doc-modal{align-items:flex-start;overflow-y:auto;padding:22px 0}
+#new-doc-modal .modal{max-width:500px;max-height:calc(100vh - 44px);overflow-y:auto;padding:20px 20px 16px}
+#new-doc-modal .modal-title{position:sticky;top:0;background:var(--card);z-index:2;padding-bottom:10px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+/* Force create-doc text editor to stay light regardless of theme or inherited styles */
+#new-doc-modal #doc-content-editor{
+  background:#ffffff !important;
+  color:#000000 !important;
+  border-color:#e5e7eb !important;
+  -webkit-text-fill-color:#000000;
+  caret-color:#000000;
+}
+#new-doc-modal #doc-content-editor::placeholder{color:#6b7280 !important}
+
+/* View modal sizing */
+#view-doc-modal{align-items:flex-start;overflow-y:auto;padding:16px 0}
+#view-doc-modal .modal{max-height:calc(100vh - 32px);overflow-y:auto;min-width:min(96vw,640px)}
+/* PDF view mode: full-width tall modal */
+#view-doc-modal .modal.pdf-view-mode{
+  width:min(99vw,1100px);max-width:99vw;
+  max-height:calc(100vh - 16px);
+  padding:12px 10px 8px;
+}
+#view-doc-modal .modal.pdf-view-mode .doc-preview-box{
+  min-height:82vh;
+}
+
+/* Progress */
+.upload-prog{background:var(--border);border-radius:4px;height:6px;margin-top:16px;display:none;overflow:hidden}
+.upload-prog-bar{height:100%;background:linear-gradient(90deg,var(--accent),#b7791f);border-radius:4px;width:0;transition:width .3s}
+
+/* View Modal */
+.doc-view-header{background:linear-gradient(135deg,#fff0e4,#fff8f1);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.doc-view-title{font-size:18px;font-weight:700;margin-bottom:8px}
+.doc-meta{display:flex;gap:16px;flex-wrap:wrap}
+.doc-meta-item{font-size:11px;color:var(--text2)}
+.doc-meta-item strong{color:var(--text);font-weight:600}
+.sign-timeline{position:relative;padding-right:20px}
+.sign-timeline::before{content:'';position:absolute;right:7px;top:0;bottom:0;width:2px;background:var(--border2)}
+.sign-item{position:relative;margin-bottom:14px}
+.sign-item::before{content:'';position:absolute;right:-14px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--border2);border:2px solid var(--bg)}
+.sign-item.signed::before{background:var(--green)}
+.sign-item.pending::before{background:var(--gold)}
+.sign-item.approved::before{background:var(--green)}
+.sign-item.rejected::before{background:var(--red)}
+.sign-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.sign-meta{font-size:11px;color:var(--text3)}
+.doc-preview-box{background:var(--card2);border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:14px;display:flex;align-items:center;justify-content:center;min-height:220px;max-height:340px}
+.doc-preview-box img{width:100%;height:auto;max-height:340px;object-fit:contain;background:#fff}
+.doc-preview-box iframe{width:100%;height:340px;border:none;background:#fff}
+.doc-preview-empty{font-size:13px;color:var(--text3);padding:18px;text-align:center}
+
+/* Text doc clishe */
+.doc-clishe{background:#ffffff;color:#000000;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:14px}
+.doc-clishe-head{padding:14px 16px;border-bottom:1px solid #e5e7eb;background:linear-gradient(135deg,#f8fafc,#eef2ff)}
+.doc-clishe-brand{font-size:13px;font-weight:700;color:#8b451f;margin-bottom:6px}
+.doc-clishe-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#334155}
+.doc-clishe-template{padding:10px 14px;border-bottom:1px solid #e5e7eb;background:#f8fafc}
+.doc-clishe-template-images{display:grid;gap:8px;margin-bottom:8px}
+.doc-clishe-template-images img{width:100%;max-height:180px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:8px}
+.doc-clishe-template-lines{background:#ffffff;border:1px dashed #e5e7eb;border-radius:8px;padding:8px;max-height:220px;overflow:auto}
+.doc-clishe-template-lines div{font-size:12px;line-height:1.7;color:#0f172a}
+.doc-clishe-body{padding:16px;font-family:'IBM Plex Sans Arabic',sans-serif;line-height:1.9;font-size:16px;direction:rtl;white-space:pre-wrap}
+.doc-clishe-body p,.doc-clishe-body div{margin:0 0 8px 0}
+
+/* DOCX template preview */
+.docx-template-preview{margin-top:8px;display:none;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px}
+.docx-template-preview-title{font-size:11px;color:var(--text3);margin-bottom:7px}
+.docx-template-preview-images{display:grid;gap:8px}
+.docx-template-preview-images img{width:100%;max-height:170px;object-fit:contain;background:var(--card);border:1px solid var(--border);border-radius:8px}
+.docx-template-preview-lines{margin-top:8px;background:#ffffff;border:1px dashed #e5e7eb;border-radius:8px;padding:8px;max-height:220px;overflow:auto}
+.docx-template-preview-lines div{font-size:12px;line-height:1.7;color:#000000}
+.docx-template-preview-empty{font-size:12px;color:var(--text3);text-align:center;padding:6px 2px}
+
+/* mention picker */
+.mention-list{background:var(--card2);border:1px solid var(--border2);border-radius:10px;max-height:180px;overflow-y:auto;margin-top:8px;display:block}
+.mention-item{padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--border)}
+.mention-item:last-child{border-bottom:none}
+.mention-item:hover{background:var(--accent-dim)}
+.mention-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#b7791f);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.mention-name{font-size:13px;font-weight:600}
+.mention-role{font-size:10px;color:var(--text3)}
+.mention-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid rgba(166,90,42,.25);border-radius:6px;padding:4px 8px;font-size:12px;margin:3px}
+.mention-chip button{background:none;border:none;color:var(--text3);cursor:pointer;padding:0;font-size:14px;line-height:1}
+
+/* archive verification for employee */
+.archive-check-panel{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;margin-bottom:16px}
+.archive-check-title{font-size:14px;font-weight:700}
+.archive-check-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.archive-check-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.archive-check-form input{background:var(--card2);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;flex:1;min-width:220px;direction:ltr}
+.archive-check-form input:focus{border-color:var(--accent)}
+.archive-check-result{margin-top:10px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px}
+.archive-check-empty{color:var(--text3)}
+.archive-check-ok{border-color:rgba(52,211,153,.25)}
+.archive-check-miss{border-color:rgba(248,113,113,.28);color:var(--red)}
+.archive-sign-list{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}
+.archive-sign-item{padding:7px 0;border-bottom:1px solid rgba(26,30,42,.55)}
+.archive-sign-item:last-child{border-bottom:none;padding-bottom:0}
+
+@media (max-width:860px){
+  .doc-grid{grid-template-columns:1fr}
+  .approval-queue-list{grid-template-columns:1fr}
+  .table-wrap{overflow-x:auto}
+  #docs-table table{min-width:620px}
+  #new-doc-modal .modal,#view-doc-modal .modal,#edit-doc-modal .modal{width:100%;max-width:none !important;min-width:0}
+  .archive-check-form input{min-width:0}
+  .archive-check-form .btn-primary{width:100%}
+}
+
+@media (max-width:640px){
+  .docs-filters > *{width:100%}
+  .docs-filters select{min-width:0}
+  .view-switch{width:100%;justify-content:center}
+  .archive-section-grid{grid-template-columns:1fr !important}
+  .mactions > *{width:100%;justify-content:center}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if session.get('user_role') == 'user' %}
+<div class="archive-check-panel">
+  <div class="archive-check-title"><i class="fa-solid fa-magnifying-glass"></i> تحقق برقم الأرشيف</div>
+  <div class="archive-check-sub">تأكيد وجود الوثيقة بالرقم مع إظهار تواقيع المدراء فقط بدون ختم</div>
+  <div class="archive-check-form">
+    <input id="archive-check-input" type="text" placeholder="مثال: HR01 أو HR125" onkeydown="if(event.key==='Enter'){event.preventDefault();verifyArchiveNumber();}">
+    <button class="btn-primary" type="button" onclick="verifyArchiveNumber()">تحقق</button>
+  </div>
+  <div id="archive-check-result" class="archive-check-result archive-check-empty">أدخل رقم الأرشيف للتحقق</div>
+</div>
+{% endif %}
+
+<!-- فلاتر وبحث -->
+<div class="docs-filters" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+  <input id="doc-search" placeholder="بحث في الوثائق..." oninput="filterDocs()"
+    style="background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;flex:1;min-width:200px;direction:rtl">
+  <select id="status-filter" onchange="filterDocs()"
+    style="background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;cursor:pointer">
+    <option value="">كل الحالات</option>
+    <option value="draft">مسودة</option>
+    <option value="pending">معلق</option>
+    <option value="approved">معتمد</option>
+    <option value="rejected">مرفوض</option>
+  </select>
+  <div class="view-switch" style="display:flex;gap:4px;background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:4px">
+    <button class="view-btn active" onclick="setView('grid',this)" title="شبكة">▦</button>
+    <button class="view-btn" onclick="setView('list',this)" title="قائمة">☰</button>
+  </div>
+</div>
+
+{% if session.get('user_role') in ['admin','manager'] %}
+<div class="approval-queue" id="approval-queue-wrap" style="display:none">
+  <div class="approval-queue-head">
+    <div class="approval-queue-title"><i class="fa-solid fa-bell"></i> ملفات تحتاج اعتمادك</div>
+    <div class="approval-queue-count">العدد: <strong id="approval-queue-count">0</strong></div>
+  </div>
+  <div class="approval-queue-list" id="approval-queue-list"></div>
+</div>
+{% endif %}
+
+<!-- Grid View -->
+<div id="grid-view">
+  <div class="doc-grid" id="docs-grid">
+    <div class="empty" style="grid-column:1/-1"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div>
+  </div>
+</div>
+
+<!-- List View -->
+<div id="list-view" style="display:none">
+  <div class="table-wrap">
+    <div id="docs-table"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div></div>
+  </div>
+</div>
+
+<!-- ══════ Modal وثيقة جديدة ══════ -->
+<div class="modal-overlay" id="new-doc-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title"><i class="fa-solid fa-file-circle-plus"></i> وثيقة جديدة</div>
+
+    <!-- Tabs النوع -->
+    <div style="display:flex;gap:4px;background:var(--card2);border-radius:8px;padding:3px;margin-bottom:18px">
+      <button class="dtype-btn active" data-dtype="upload" onclick="setDocType('upload',this)"><i class="fa-solid fa-paperclip"></i> رفع ملف</button>
+      <button class="dtype-btn" data-dtype="text" onclick="setDocType('text',this)"><i class="fa-solid fa-file-pen"></i> كتابة نص</button>
+    </div>
+
+    <div class="mfield">
+      <label>عنوان الوثيقة</label>
+      <input type="text" id="doc-title" placeholder="مثال: عقد توريد المعدات">
+    </div>
+
+    <div class="mfield">
+      <label>قسم الأرشيف</label>
+      {% if session.get('user_role') in ['admin','sys_admin','manager'] %}
+      <select id="doc-archive-section-id" data-default-value="{{ current_user.archive_section_id if current_user and current_user.archive_section_id else '' }}" onchange="syncDocArchiveSectionSelection()" style="width:100%;margin-bottom:8px;background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif">
+        <option value="{{ current_user.archive_section_id if current_user and current_user.archive_section_id else '' }}">{{ current_user.archive_section if current_user else 'عام' }}</option>
+      </select>
+      {% else %}
+      <input type="hidden" id="doc-archive-section-id" value="{{ current_user.archive_section_id if current_user and current_user.archive_section_id else '' }}" data-default-value="{{ current_user.archive_section_id if current_user and current_user.archive_section_id else '' }}">
+      {% endif %}
+      <div class="archive-section-grid" style="display:grid;grid-template-columns:1fr 130px;gap:8px">
+        <input type="text" id="doc-archive-section" value="{{ current_user.archive_section if current_user else 'عام' }}" readonly data-default-value="{{ current_user.archive_section if current_user else 'عام' }}">
+        <input type="text" id="doc-archive-section-code" maxlength="2" value="{{ current_user.archive_section_code if current_user else 'GN' }}" readonly data-default-value="{{ current_user.archive_section_code if current_user else 'GN' }}" style="direction:ltr;text-transform:uppercase">
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">{% if session.get('user_role') in ['admin','sys_admin'] %}يمكنك اختيار القسم الذي سيتم حفظ الوثيقة داخله، ورقم الأرشيف يُولد من القسم المختار{% elif session.get('user_role') == 'manager' %}يمكنك اختيار أي قسم ضمن الأقسام المصرح لك بها، ورقم الأرشيف يُولد من القسم المختار{% else %}يتم تحديد القسم تلقائياً حسب قسم المستخدم الذي عيّنته الإدارة، ورقم الأرشيف يُولد منه مباشرة{% endif %}</div>
+    </div>
+
+    <!-- رفع ملف -->
+    <div id="type-upload">
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+           ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+        <div class="upload-zone-icon"><i class="fa-solid fa-paperclip"></i></div>
+        <div class="upload-zone-text">اسحب الملف هنا أو انقر للاختيار</div>
+        <div class="upload-zone-sub">PDF, Word, صور — حد أقصى 10MB</div>
+        <div class="upload-prog" id="upload-prog"><div class="upload-prog-bar" id="upload-bar"></div></div>
+      </div>
+      <input type="file" id="file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" style="display:none" onchange="fileSelected()">
+      <div id="file-name" style="font-size:12px;color:var(--green);margin-top:8px;display:none"></div>
+    </div>
+
+    <!-- كتابة نص -->
+    <div id="type-text" style="display:none">
+      <div class="mfield">
+        <label>محتوى الوثيقة</label>
+        <div class="text-toolbar">
+          <label for="rt-font-size">حجم الخط</label>
+          <select id="rt-font-size">
+            <option value="12">12</option>
+            <option value="14">14</option>
+            <option value="16" selected>16</option>
+            <option value="18">18</option>
+            <option value="20">20</option>
+            <option value="24">24</option>
+            <option value="28">28</option>
+          </select>
+          <label for="rt-color">لون النص</label>
+          <input type="color" id="rt-color" value="#000000">
+          <button type="button" class="text-style-btn" onclick="applyTextStyle()">تطبيق على النص المحدد</button>
+        </div>
+<textarea id="doc-content-editor" 
+  style="width:100%;min-height:160px;background:#ffffff;border:1.5px solid #e5e7eb;border-radius:9px;padding:11px 13px;color:#000000;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:15px;line-height:1.9;outline:none;direction:rtl;resize:vertical"
+  placeholder="اكتب محتوى الوثيقة هنا..."></textarea>      </div>
+
+      <div class="mfield" style="margin-top:10px">
+        <label>مجلد قوالب DOCX (اختياري)</label>
+        <select id="text-template-select" onchange="onTextTemplateChange()"
+          style="width:100%;background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;cursor:pointer">
+          <option value="">بدون قالب (نص فقط)</option>
+        </select>
+        <div id="text-template-meta" style="font-size:12px;color:var(--text3);margin-top:8px">يمكنك رفع عدة قوالب DOCX واختيار واحد منها</div>
+        <div id="text-template-preview" class="docx-template-preview"></div>
+        <button type="button" class="btn-ghost" style="width:100%;margin-top:8px" onclick="document.getElementById('text-template-input').click()"><i class="fa-solid fa-file-arrow-up"></i> رفع قالب جديد إلى مجلد القوالب</button>
+        <input type="file" id="text-template-input" accept=".docx" style="display:none" onchange="textTemplateSelected()">
+      </div>
+    </div>
+
+    <!-- mention -->
+    <div class="mfield">
+      <label>طلب توقيع من (اختياري)</label>
+      <input type="text" id="mention-search" placeholder="ابحث عن موظف أو مدير..." oninput="searchMentions()" onfocus="openMentionList()" onclick="openMentionList()" autocomplete="off">
+      <div class="mention-list" id="mention-list"></div>
+      <div id="mentions-chips" style="margin-top:6px"></div>
+    </div>
+
+    <div class="mfield">
+      <label>ملاحظة (اختياري)</label>
+      <input type="text" id="doc-note" placeholder="ملاحظة للموظفين المطلوب توقيعهم">
+    </div>
+
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('new-doc-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="createDoc()" id="create-btn">إنشاء وإرسال</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ Modal عرض الوثيقة ══════ -->
+<div class="modal-overlay" id="view-doc-modal">
+  <div class="modal" style="max-width:580px">
+    <div id="view-content">...</div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('view-doc-modal')">إغلاق</button>
+      <button class="btn-primary" id="dl-btn" style="display:none" onclick="downloadDoc()"><i class="fa-solid fa-file-pdf"></i> تحميل PDF</button>
+      <button class="btn-ghost" id="print-btn" style="display:none" onclick="printDoc()"><i class="fa-solid fa-file-pdf"></i> PDF / طباعة</button>
+      <button class="btn-ghost" id="convert-btn" style="display:none" onclick="convertDocToPdf()"><i class="fa-solid fa-rotate"></i> تحويل PDF</button>
+      <button class="btn-ghost" id="edit-btn" style="display:none" onclick="openEditDoc()"><i class="fa-solid fa-pen-to-square"></i> تعديل</button>
+      <button class="btn-primary" id="sign-btn" style="display:none;background:linear-gradient(135deg,#a65a2a,#8b451f)" onclick="goSign()"><i class="fa-solid fa-signature"></i> توقيع وختم</button>
+      <button class="btn-danger" id="delete-btn" style="display:none" onclick="archiveDoc()"><i class="fa-solid fa-box-archive"></i> حذف للأرشيف</button>
+      {% if session.get('user_role') in ['admin','manager'] %}
+      <button class="btn-primary" id="approve-btn" style="display:none;background:linear-gradient(135deg,#065f46,#059669)" onclick="approveDoc()"><i class="fa-solid fa-circle-check"></i> اعتماد</button>
+      <button class="btn-danger" id="reject-btn" style="display:none" onclick="rejectDoc()"><i class="fa-solid fa-circle-xmark"></i> رفض</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ══════ Modal تعديل الوثيقة ══════ -->
+<div class="modal-overlay" id="edit-doc-modal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-title"><i class="fa-solid fa-pen-to-square"></i> تعديل الوثيقة</div>
+
+    <div class="mfield">
+      <label>عنوان الوثيقة</label>
+      <input type="text" id="edit-doc-title" placeholder="عنوان الوثيقة">
+    </div>
+
+    <div class="mfield">
+      <label>محتوى الوثيقة</label>
+      <div id="edit-doc-content-editor" class="rich-editor" contenteditable="true" data-placeholder="عدّل النص هنا..."></div>
+    </div>
+
+    <div class="mfield">
+      <label>ملاحظة (اختياري)</label>
+      <input type="text" id="edit-doc-note" placeholder="ملاحظة">
+    </div>
+
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('edit-doc-modal')">إلغاء</button>
+      <button class="btn-primary" id="save-edit-btn" onclick="saveDocEdit()"><i class="fa-solid fa-floppy-disk"></i> حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.dtype-btn{flex:1;background:none;border:none;padding:8px;border-radius:6px;color:var(--text2);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.dtype-btn.active{background:var(--accent-dim);color:var(--accent)}
+.view-btn{width:32px;height:32px;background:none;border:none;color:var(--text3);cursor:pointer;border-radius:6px;font-size:14px;transition:all .2s}
+.view-btn.active,.view-btn:hover{background:var(--accent-dim);color:var(--accent)}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allDocs = [];
+let currentDocId = null;
+let currentSignUrl = null;
+let selectedFile = null;
+let selectedTextTemplateName = '';
+let docxTemplates = [];
+const docxTemplatePreviewCache = new Map();
+let currentDocType = 'upload';
+let mentionedUsers = [];
+let allUsers = [];
+let currentDocData = null;
+let docArchiveSections = [];
+const DOC_TYPE_STORAGE_KEY = 'najm_doc_create_type';
+const DOCX_TEMPLATE_STORAGE_KEY = 'najm_selected_docx_template';
+const mentionRoleLabels = {admin:'مدير عام',manager:'مدير',user:'موظف'};
+const statusMap   = {draft:'badge-draft',pending:'badge-pending',approved:'badge-approved',rejected:'badge-rejected'};
+const statusLabel = {draft:'مسودة',pending:'معلق',approved:'معتمد',rejected:'مرفوض'};
+const docColors   = {draft:'var(--text3)',pending:'var(--gold)',approved:'var(--green)',rejected:'var(--red)'};
+const docIcons    = {
+  draft:'<i class="fa-solid fa-file-pen"></i>',
+  pending:'<i class="fa-solid fa-hourglass-half"></i>',
+  approved:'<i class="fa-solid fa-circle-check"></i>',
+  rejected:'<i class="fa-solid fa-circle-xmark"></i>'
+};
+const archiveStatusLabel = {approved:'معتمد',archived:'مؤرشف',pending:'معلق',draft:'مسودة',rejected:'مرفوض'};
+
+function getPreferredDocType(){
+  try {
+    const value = localStorage.getItem(DOC_TYPE_STORAGE_KEY);
+    return (value === 'text' || value === 'upload') ? value : 'text';
+  } catch {
+    return 'text';
+  }
+}
+
+function applyPreferredDocType(){
+  const preferred = getPreferredDocType();
+  const btn = document.querySelector(`.dtype-btn[data-dtype="${preferred}"]`);
+  if(btn) setDocType(preferred, btn);
+}
+
+function getPreferredTemplateName(){
+  try {
+    return localStorage.getItem(DOCX_TEMPLATE_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+async function openNewDocModal(){
+  openModal('new-doc-modal');
+  await loadDocArchiveSections();
+  setTimeout(()=>prepareMentionListForModal(), 60);
+}
+
+if (typeof window.openModal === 'function') {
+  const _originalOpenModal = window.openModal;
+  window.openModal = function(id){
+    _originalOpenModal(id);
+    if(id === 'new-doc-modal'){
+      setTimeout(()=>prepareMentionListForModal(), 60);
+    }
+  };
+}
+
+async function prepareMentionListForModal(){
+  const list = document.getElementById('mention-list');
+  if(list){
+    list.innerHTML = `<div class="mention-item" style="cursor:default;opacity:.75"><i class="fa-solid fa-hourglass-half"></i> جاري تحميل المستخدمين...</div>`;
+    list.style.display = '';
+  }
+  if(!Array.isArray(allUsers) || !allUsers.length){
+    await loadUsers();
+  }
+  openMentionList();
+  setTimeout(()=>{
+    const mentionInput = document.getElementById('mention-search');
+    mentionInput?.scrollIntoView({block:'center', behavior:'smooth'});
+    mentionInput?.focus();
+  }, 80);
+}
+
+function syncDocArchiveSectionSelection(){
+  const selector = document.getElementById('doc-archive-section-id');
+  const sectionInput = document.getElementById('doc-archive-section');
+  const codeInput = document.getElementById('doc-archive-section-code');
+  if(!selector || !sectionInput || !codeInput) return;
+
+  if(selector.tagName !== 'SELECT'){
+    sectionInput.value = sectionInput.dataset.defaultValue || sectionInput.value || 'عام';
+    codeInput.value = (codeInput.dataset.defaultValue || codeInput.value || 'GN').toUpperCase();
+    return;
+  }
+
+  const selectedValue = String(selector.value || '');
+  const selectedSection = docArchiveSections.find(item => String(item.id ?? '') === selectedValue)
+    || docArchiveSections.find(item => String(item.id ?? '') === String(selector.dataset.defaultValue || ''))
+    || docArchiveSections[0];
+
+  if(!selectedSection) return;
+
+  selector.value = String(selectedSection.id ?? '');
+  sectionInput.value = selectedSection.section_name || sectionInput.dataset.defaultValue || 'عام';
+  codeInput.value = String(selectedSection.section_code || codeInput.dataset.defaultValue || 'GN').toUpperCase();
+}
+
+async function loadDocArchiveSections(){
+  const selector = document.getElementById('doc-archive-section-id');
+  const sectionInput = document.getElementById('doc-archive-section');
+  const codeInput = document.getElementById('doc-archive-section-code');
+  if(!selector || !sectionInput || !codeInput) return;
+
+  if(selector.tagName !== 'SELECT'){
+    syncDocArchiveSectionSelection();
+    return;
+  }
+
+  const defaultId = String(selector.dataset.defaultValue || '');
+  const previousId = String(selector.value || '');
+
+  try {
+    const res = await fetch('/api/archive-sections', {headers:{'Accept':'application/json'}});
+    const data = await res.json();
+    docArchiveSections = Array.isArray(data)
+      ? data.filter(item => Number(item.is_active ?? 1) === 1)
+      : [];
+  } catch {
+    docArchiveSections = [];
+  }
+
+  if(!docArchiveSections.length){
+    docArchiveSections = [{
+      id: defaultId || null,
+      section_name: sectionInput.dataset.defaultValue || sectionInput.value || 'عام',
+      section_code: (codeInput.dataset.defaultValue || codeInput.value || 'GN').toUpperCase()
+    }];
+  }
+
+  selector.innerHTML = '';
+  docArchiveSections.forEach(section => {
+    const option = document.createElement('option');
+    option.value = String(section.id ?? '');
+    option.textContent = `${section.section_name || 'عام'} (${String(section.section_code || 'GN').toUpperCase()})`;
+    selector.appendChild(option);
+  });
+
+  const targetId = [previousId, defaultId].find(id =>
+    id && docArchiveSections.some(section => String(section.id ?? '') === String(id))
+  ) || String(docArchiveSections[0].id ?? '');
+
+  selector.value = targetId;
+  syncDocArchiveSectionSelection();
+}
+
+function getFileExt(path=''){
+  const clean = (path || '').split('?')[0].toLowerCase();
+  const idx = clean.lastIndexOf('.');
+  return idx > -1 ? clean.slice(idx + 1) : '';
+}
+
+function isPdfPath(path=''){
+  return getFileExt(path) === 'pdf';
+}
+
+function canSignByRequest(doc){
+  return !!(doc && doc.status !== 'approved' && doc.needs_sign && doc.pending_sign_request_id);
+}
+
+function canSignDirectDoc(doc){
+  return !!(doc && doc.status !== 'approved' && doc.can_sign_direct);
+}
+
+function canDownloadDoc(doc){
+  return !!(doc && (doc.can_download || doc.file_path || doc.archive_storage_path || doc.content_json));
+}
+
+function getDocDownloadBase(doc){
+  if(!doc || !doc.id) return '';
+  return `/api/documents/${doc.id}/download-signed`;
+}
+
+function getDocInlineDownloadUrl(doc){
+  const base = getDocDownloadBase(doc);
+  return base ? `${base}?inline=1` : '';
+}
+
+function buildThumbHtml(d){
+  if(!d.file_path) return `<div class="doc-thumb"><div class="doc-thumb-fallback">${docIcons[d.status]||'<i class="fa-solid fa-file-lines"></i>'}</div></div>`;
+  const ext = getFileExt(d.file_path);
+  const inlineUrl = getDocInlineDownloadUrl(d);
+  if(['png','jpg','jpeg','gif','webp'].includes(ext)){
+    return `<div class="doc-thumb"><img src="${inlineUrl}" alt="${d.title}"></div>`;
+  }
+  if(ext === 'pdf'){
+    return `<div class="doc-thumb"><div class="doc-thumb-fallback"><i class="fa-solid fa-file-pdf"></i></div></div>`;
+  }
+  return `<div class="doc-thumb"><div class="doc-thumb-fallback"><i class="fa-solid fa-paperclip"></i></div></div>`;
+}
+
+function escapeHtml(value=''){
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function verifyArchiveNumber(){
+  const input = document.getElementById('archive-check-input');
+  const resultEl = document.getElementById('archive-check-result');
+  if(!input || !resultEl) return;
+
+  const archiveNumber = (input.value || '').trim();
+  if(!archiveNumber){
+    resultEl.className = 'archive-check-result archive-check-miss';
+    resultEl.textContent = 'أدخل رقم الأرشيف أولاً';
+    return;
+  }
+
+  resultEl.className = 'archive-check-result archive-check-empty';
+  resultEl.textContent = 'جارٍ التحقق...';
+
+  try {
+    const res = await fetch(`/api/archive/check?archive_number=${encodeURIComponent(archiveNumber)}`, {
+      headers:{'Accept':'application/json'}
+    });
+    const data = await res.json();
+
+    if(!res.ok || !data.success){
+      resultEl.className = 'archive-check-result archive-check-miss';
+      resultEl.textContent = data.error || 'فشل التحقق من رقم الأرشيف';
+      return;
+    }
+
+    if(!data.exists){
+      resultEl.className = 'archive-check-result archive-check-miss';
+      resultEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> الرقم ${archiveNumber} غير موجود`;
+      return;
+    }
+
+    const doc = data.doc || {};
+    const signatures = Array.isArray(data.manager_signatures) ? data.manager_signatures : [];
+    const statusText = archiveStatusLabel[doc.status] || (doc.status || '—');
+
+    resultEl.className = 'archive-check-result archive-check-ok';
+    resultEl.innerHTML = `
+      <div><i class="fa-solid fa-circle-check"></i> الرقم موجود: <strong>${escapeHtml(doc.archive_number || archiveNumber)}</strong></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px">العنوان: ${escapeHtml(doc.title || '—')} • القسم: ${escapeHtml(doc.archive_section || 'عام')} (${escapeHtml(doc.archive_section_code || 'GN')}) • الحالة: ${escapeHtml(statusText)}</div>
+      <div class="archive-sign-list">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">تواقيع المدراء (بدون ختم)</div>
+        ${signatures.length ? signatures.map(s => `
+          <div class="archive-sign-item">
+            <div style="font-size:12px;font-weight:600">${escapeHtml(s.signer_name || '—')}</div>
+            <div style="font-size:10px;color:var(--text3);direction:ltr">${escapeHtml((s.signed_at || '').replace('T',' ').slice(0,16) || '—')}</div>
+            <div style="font-size:10px;color:var(--accent);font-family:monospace">${escapeHtml(s.serial_number || '—')}</div>
+          </div>
+        `).join('') : '<div style="font-size:12px;color:var(--text3)">لا توجد تواقيع مدراء بدون ختم لهذا الرقم.</div>'}
+      </div>
+    `;
+  } catch {
+    resultEl.className = 'archive-check-result archive-check-miss';
+    resultEl.textContent = 'فشل الاتصال بالخادم أثناء التحقق';
+  }
+}
+
+function sanitizeRichHtml(raw=''){
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${raw || ''}</div>`, 'text/html');
+  const root = doc.body.firstElementChild;
+  if(!root) return '';
+
+  const allowedTags = new Set(['DIV','P','BR','SPAN','STRONG','B','EM','I','U']);
+  const blockedTags = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','LINK','META']);
+
+  const cleanStyle = (styleText='') => {
+    const result = [];
+    styleText.split(';').forEach(part => {
+      const [propRaw, valueRaw] = part.split(':');
+      if(!propRaw || !valueRaw) return;
+      const prop = propRaw.trim().toLowerCase();
+      const value = valueRaw.trim();
+      if(prop === 'color' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)) {
+        result.push(`color:${value}`);
+      }
+      if(prop === 'font-size') {
+        const parsed = parseFloat(value);
+        if(!Number.isNaN(parsed)) {
+          const clamped = Math.max(10, Math.min(40, parsed));
+          result.push(`font-size:${clamped}px`);
+        }
+      }
+    });
+    return result.join(';');
+  };
+
+  const walk = (node) => {
+    const children = Array.from(node.children);
+    for(const child of children){
+      const tag = child.tagName;
+      if(blockedTags.has(tag)) {
+        child.remove();
+        continue;
+      }
+      if(!allowedTags.has(tag)) {
+        const fragment = doc.createDocumentFragment();
+        while(child.firstChild) fragment.appendChild(child.firstChild);
+        child.replaceWith(fragment);
+        continue;
+      }
+
+      Array.from(child.attributes).forEach(attr => {
+        if(attr.name.toLowerCase() !== 'style') child.removeAttribute(attr.name);
+      });
+
+      if(child.hasAttribute('style')) {
+        const cleaned = cleanStyle(child.getAttribute('style') || '');
+        if(cleaned) child.setAttribute('style', cleaned);
+        else child.removeAttribute('style');
+      }
+      walk(child);
+    }
+  };
+
+  walk(root);
+  return root.innerHTML;
+}
+
+// استبدل getEditorContentHtml و getEditorPlainText
+function getEditorContentHtml(){
+  const editor = document.getElementById('doc-content-editor');
+  if(!editor) return '';
+  const raw = editor.value ? editor.value.trim() : (editor.innerHTML || '').trim();
+  // إذا textarea
+  if(editor.tagName === 'TEXTAREA'){
+    return raw.split('\n').map(line => 
+      `<p><span style="font-size:16px;color:#000000">${escapeHtml(line)}</span></p>`
+    ).join('');
+  }
+  return sanitizeRichHtml(raw);
+}
+
+function getEditorPlainText(){
+  const editor = document.getElementById('doc-content-editor');
+  if(!editor) return '';
+  if(editor.tagName === 'TEXTAREA') return (editor.value || '').trim();
+  return (editor.innerText || '').trim();
+}
+function getEditEditorContentHtml(){
+  const editor = document.getElementById('edit-doc-content-editor');
+  const raw = (editor && editor.innerHTML) ? editor.innerHTML.trim() : '';
+  return sanitizeRichHtml(raw);
+}
+
+function getEditEditorPlainText(){
+  const editor = document.getElementById('edit-doc-content-editor');
+  return (editor && editor.innerText) ? editor.innerText.trim() : '';
+}
+
+function applyTextStyle(){
+  const editor = document.getElementById('doc-content-editor');
+  const selection = window.getSelection();
+  if(!editor || !selection || selection.rangeCount === 0) {
+    toast('حدد النص أولاً ثم طبّق التنسيق', 'error');
+    return;
+  }
+
+  const range = selection.getRangeAt(0);
+  if(range.collapsed || !editor.contains(range.commonAncestorContainer)) {
+    toast('حدد جزءًا من النص داخل منطقة الكتابة', 'error');
+    return;
+  }
+
+  const selectedSize = parseInt(document.getElementById('rt-font-size')?.value || '16', 10);
+  const safeSize = Math.max(10, Math.min(40, Number.isNaN(selectedSize) ? 16 : selectedSize));
+  const selectedColor = document.getElementById('rt-color')?.value || '#000000';
+
+  const span = document.createElement('span');
+  span.style.fontSize = `${safeSize}px`;
+  span.style.color = selectedColor;
+  span.style.fontFamily = "'IBM Plex Sans Arabic', sans-serif";
+
+  const fragment = range.extractContents();
+  span.appendChild(fragment);
+  range.insertNode(span);
+  selection.removeAllRanges();
+}
+
+function buildTextTemplateSectionHtml(templateName='', preview={}){
+  const normalizedName = String(templateName || '').trim();
+  const images = Array.isArray(preview.header_images) ? preview.header_images.filter(Boolean) : [];
+  const headerLines = Array.isArray(preview.header_lines) ? preview.header_lines.filter(Boolean) : [];
+  const bodyLines = Array.isArray(preview.body_lines) ? preview.body_lines.filter(Boolean) : [];
+  const lines = [...headerLines, ...bodyLines]
+    .map(line => String(line || '').trim())
+    .filter(Boolean);
+
+  if(!normalizedName && !images.length && !lines.length) return '';
+
+  const imagesHtml = images.length
+    ? `<div class="doc-clishe-template-images">${images.map(src => `<img src="${src}" alt="template-image">`).join('')}</div>`
+    : '';
+
+  const linesHtml = lines.length
+    ? `<div class="doc-clishe-template-lines">${lines.map(line => `<div>${escapeHtml(line)}</div>`).join('')}</div>`
+    : '<div class="doc-clishe-template-lines"><div>لا توجد سطور ظاهرة في هذا القالب</div></div>';
+
+  return `
+    <div class="doc-clishe-template">
+      <div style="font-size:11px;color:#475569;margin-bottom:8px">القالب المستخدم: <strong>${escapeHtml(normalizedName || '—')}</strong></div>
+      ${imagesHtml}
+      ${linesHtml}
+    </div>
+  `;
+}
+
+function buildTextDocHtml(d, templatePreview={}){
+  const raw = (d.content_json || '').trim();
+  if(!raw) return '';
+
+  const createdAt = (d.created_at||'').replace('T',' ').slice(0,16);
+  const templateName = (d.template_name||'').trim();
+
+  // ── فك تشفير المحتوى ─────────────────────
+  let bodyHtml = '';
+  try {
+    const parsed = JSON.parse(raw);
+    if(parsed.html)       bodyHtml = sanitizeRichHtml(parsed.html);
+    else if(parsed.text)  bodyHtml = parsed.text.split('\n').map(l=>`<p>${escapeHtml(l)}</p>`).join('');
+    else if(typeof parsed === 'string') bodyHtml = sanitizeRichHtml(parsed);
+  } catch {
+    bodyHtml = /<\/?[a-z][\s\S]*>/i.test(raw)
+      ? sanitizeRichHtml(raw)
+      : raw.split('\n').map(l=>`<p>${escapeHtml(l)}</p>`).join('');
+  }
+
+  // ── هيدر الكلشية (letterhead) ──────────────
+  const imgs   = Array.isArray(templatePreview?.header_images) ? templatePreview.header_images.filter(Boolean).slice(0,2) : [];
+  const hLines = Array.isArray(templatePreview?.header_lines)  ? templatePreview.header_lines.filter(Boolean).slice(0,4)  : [];
+
+  const letterheadHtml = imgs.length ? `
+    <div style="background:#fff;padding:12px 20px 0;text-align:center;border-bottom:2px solid #e2e8f0">
+      <img src="${imgs[0]}" style="max-height:150px;max-width:100%;object-fit:contain;display:inline-block">
+      ${imgs[1] ? `<img src="${imgs[1]}" style="max-height:150px;max-width:100%;object-fit:contain;display:inline-block;margin-right:8px">` : ''}
+      ${hLines.length ? `<div style="font-size:11px;color:#334155;padding:6px 0 8px;direction:rtl;line-height:1.8;text-align:right">${hLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>` : ''}
+    </div>` : (hLines.length ? `
+    <div style="background:#f8fafc;padding:8px 20px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#334155;direction:rtl;line-height:1.8">
+      ${hLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}
+    </div>` : '');
+
+  return `
+    <div style="background:#fff;color:#000;border:1px solid #d1d5db;border-radius:10px;overflow:hidden;margin-bottom:14px;direction:rtl;font-family:'IBM Plex Sans Arabic',Arial,sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+      ${letterheadHtml}
+      <div style="padding:10px 20px 8px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;color:#475569;display:flex;gap:14px;flex-wrap:wrap">
+        <span>رقم الأرشيف: <strong style="color:#0f172a">${d.archive_number||'—'}</strong></span>
+        <span>القسم: <strong style="color:#0f172a">${d.archive_section||'عام'} (${d.archive_section_code||'GN'})</strong></span>
+        <span>التاريخ: <strong style="color:#0f172a">${createdAt||'—'}</strong></span>
+        ${templateName ? `<span>القالب: <strong style="color:#0f172a">${escapeHtml(templateName)}</strong></span>` : ''}
+      </div>
+      <div style="padding:20px 24px;font-size:15px;line-height:2;color:#0f172a;min-height:80px">
+        ${bodyHtml||'<span style="color:#94a3b8">—</span>'}
+      </div>
+    </div>`;
+}
+
+async function loadDocs(){
+  const res = await fetch('/api/documents', {headers:{'Accept':'application/json'}, cache:'no-store'});
+  allDocs   = await res.json();
+  renderApprovalQueue();
+  filterDocs();
+}
+
+function renderApprovalQueue(){
+  const wrap = document.getElementById('approval-queue-wrap');
+  const listEl = document.getElementById('approval-queue-list');
+  const countEl = document.getElementById('approval-queue-count');
+  if(!wrap || !listEl || !countEl) return;
+
+  const queue = (Array.isArray(allDocs) ? allDocs : []).filter(d => d.status === 'pending' && !!d.can_approve);
+  countEl.textContent = queue.length;
+
+  if(!queue.length){
+    wrap.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  wrap.style.display = '';
+  listEl.innerHTML = queue.slice(0, 8).map(d => `
+    <button class="approval-queue-item" onclick="viewDoc(${d.id})">
+      <div class="approval-queue-item-title">${d.title}</div>
+      <div class="approval-queue-item-meta">
+        <span style="direction:ltr;font-family:monospace">${d.archive_number || '—'}</span>
+        <span>${(d.created_at || '').slice(0,10) || '—'}</span>
+      </div>
+    </button>
+  `).join('');
+}
+
+function filterDocs(){
+  const q   = document.getElementById('doc-search').value.toLowerCase();
+  const st  = document.getElementById('status-filter').value;
+  const list= allDocs.filter(d=>
+    (!q  || d.title.toLowerCase().includes(q) || (d.archive_number||'').toLowerCase().includes(q) || (d.archive_section||'').toLowerCase().includes(q) || (d.archive_section_code||'').toLowerCase().includes(q)) &&
+    (!st || d.status===st)
+  );
+  renderGrid(list);
+  renderList(list);
+}
+
+function renderGrid(docs){
+  const el = document.getElementById('docs-grid');
+  if(!docs.length){el.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-icon"><i class="fa-solid fa-file-lines"></i></div><div class="empty-text">لا توجد وثائق</div></div>';return;}
+  el.innerHTML = docs.map(d=>`
+    <div class="doc-card ${d.needs_sign ? 'needs-sign' : ''}" style="--doc-c:${docColors[d.status]}" onclick="viewDoc(${d.id})">
+      ${buildThumbHtml(d)}
+      <div class="doc-title">${d.title}</div>
+      <div class="doc-archive">${d.archive_number||'بدون رقم أرشيف'} • ${d.archive_section||'عام'} (${d.archive_section_code||'GN'})</div>
+      ${d.needs_sign ? '<div class="doc-need-sign"><i class="fa-solid fa-signature"></i> يحتاج توقيعك</div>' : ''}
+      ${d.status==='pending' && d.can_approve ? '<div class="doc-need-approve"><i class="fa-solid fa-bell"></i> يحتاج اعتمادك</div>' : ''}
+      <span class="badge ${statusMap[d.status]}">${statusLabel[d.status]}</span>
+      <div class="doc-footer">
+        <span class="doc-date">${(d.created_at||'').slice(0,10)}</span>
+        <div class="doc-actions">
+          <button class="btn-ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();viewDoc(${d.id})">عرض</button>
+          ${canSignByRequest(d) ? `<button class="btn-primary btn-sm" style="padding:4px 10px;font-size:11px" onclick="event.stopPropagation();window.location='/sign/${d.pending_sign_request_id}'"><i class="fa-solid fa-signature"></i> وقّع المطلوب</button>` : ''}
+          ${canSignDirectDoc(d) && !d.needs_sign ? `<button class="btn-primary btn-sm" style="padding:4px 10px;font-size:11px" onclick="event.stopPropagation();window.location='/sign/doc/${d.id}'"><i class="fa-solid fa-signature"></i> وقّع</button>` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderList(docs){
+  const el = document.getElementById('docs-table');
+  if(!docs.length){el.innerHTML='<div class="empty"><div class="empty-icon"><i class="fa-solid fa-file-lines"></i></div><div class="empty-text">لا توجد وثائق</div></div>';return;}
+  el.innerHTML=`<table><thead><tr><th>الوثيقة</th><th>رقم الأرشيف</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead><tbody>
+    ${docs.map(d=>`<tr class="${d.needs_sign ? 'row-needs-sign' : ''}">
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:56px;height:44px;border-radius:7px;overflow:hidden;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;flex-shrink:0">${buildThumbHtml(d).replace('class="doc-thumb"','style="margin:0;height:100%;width:100%;border:none;border-radius:0;background:transparent"')}</div>
+          <div style="font-weight:600;font-size:13px">${d.title}${d.needs_sign ? '<span class="list-need-sign"><i class="fa-solid fa-signature"></i> يحتاج توقيعك</span>' : ''}${d.status==='pending' && d.can_approve ? '<span class="list-need-approve"><i class="fa-solid fa-bell"></i> يحتاج اعتمادك</span>' : ''}</div>
+        </div>
+      </td>
+      <td style="font-family:monospace;font-size:11px;color:var(--text3)">
+        <div style="direction:ltr">${d.archive_number||'—'}</div>
+        <div style="direction:rtl;font-family:'IBM Plex Sans Arabic',sans-serif;color:var(--text2)">${d.archive_section||'عام'} (${d.archive_section_code||'GN'})</div>
+      </td>
+      <td><span class="badge ${statusMap[d.status]}">${statusLabel[d.status]}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${(d.created_at||'').slice(0,10)}</td>
+      <td style="display:flex;gap:6px">
+        <button class="btn-ghost" onclick="viewDoc(${d.id})">عرض</button>
+        ${canSignByRequest(d) ? `<button class="btn-primary btn-sm" onclick="window.location='/sign/${d.pending_sign_request_id}'"><i class="fa-solid fa-signature"></i> وقّع المطلوب</button>` : ''}
+        ${canSignDirectDoc(d) && !d.needs_sign ? `<button class="btn-primary btn-sm" onclick="window.location='/sign/doc/${d.id}'"><i class="fa-solid fa-signature"></i> وقّع</button>` : ''}
+      </td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function setView(v,btn){
+  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('grid-view').style.display = v==='grid'?'':'none';
+  document.getElementById('list-view').style.display = v==='list'?'':'none';
+}
+
+function setDocType(t,btn){
+  document.querySelectorAll('.dtype-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentDocType = t;
+  try { localStorage.setItem(DOC_TYPE_STORAGE_KEY, t); } catch {}
+  document.getElementById('type-upload').style.display = t==='upload'?'':'none';
+  document.getElementById('type-text').style.display   = t==='text'?'':'none';
+  if(t === 'text' && !docxTemplates.length){
+    loadDocxTemplates();
+  }
+}
+
+// drag & drop
+function dragOver(e){e.preventDefault();document.getElementById('drop-zone').classList.add('drag')}
+function dragLeave(){document.getElementById('drop-zone').classList.remove('drag')}
+function dropFile(e){e.preventDefault();dragLeave();const f=e.dataTransfer.files[0];if(f)processFile(f);}
+function fileSelected(){const f=document.getElementById('file-input').files[0];if(f)processFile(f);}
+function processFile(f){
+  if(f.size>10*1024*1024) return toast('الملف أكبر من 10MB','error');
+  selectedFile=f;
+  const fn=document.getElementById('file-name');
+  fn.textContent=`${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  fn.style.display='';
+}
+
+function setTemplateEditorMode(enabled){
+  const editor = document.getElementById('doc-content-editor');
+  if(!editor) return;
+  editor.classList.toggle('template-mode', !!enabled);
+  if(enabled){
+    const colorInput = document.getElementById('rt-color');
+    if(colorInput) colorInput.value = '#000000';
+  }
+}
+
+function buildTemplateEditorHtml(preview={}){
+  const images = Array.isArray(preview.header_images) ? preview.header_images.filter(Boolean).slice(0, 2) : [];
+  const headerLines = Array.isArray(preview.header_lines) ? preview.header_lines.filter(Boolean) : [];
+  const bodyLines = Array.isArray(preview.body_lines) ? preview.body_lines.filter(Boolean) : [];
+  const lines = [...headerLines, ...bodyLines]
+    .map(line => String(line || '').trim())
+    .filter(Boolean)
+    .slice(0, 240);
+
+  const imageHtml = images.length
+    ? `<div style="display:grid;gap:8px;margin-bottom:10px">${images.map(src => `<img src="${src}" style="display:block;width:100%;max-height:170px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:8px">`).join('')}</div>`
+    : '';
+
+  if(!lines.length && !images.length) return '';
+
+  const lineHtml = lines.map(line =>
+    `<p><span style="font-size:16px;color:#000000">${escapeHtml(line)}</span></p>`
+  ).join('');
+
+  return `${imageHtml}${lineHtml}`;
+}
+
+function applyTemplateTextToEditor(templateName, preview={}){
+  const editor = document.getElementById('doc-content-editor');
+  if(!editor || currentDocType !== 'text' || !templateName) return;
+
+  const currentText = (editor.innerText || '').trim();
+  const shouldAutoFill = !currentText || editor.dataset.templateAuto === '1' || editor.dataset.templateSource === templateName;
+  if(!shouldAutoFill) return;
+
+  const templateHtml = buildTemplateEditorHtml(preview);
+  if(!templateHtml) return;
+
+  editor.innerHTML = templateHtml;
+  editor.dataset.templateSource = templateName;
+  editor.dataset.templateAuto = '1';
+}
+
+function hideTextTemplatePreview(){
+  const box = document.getElementById('text-template-preview');
+  if(!box) return;
+  box.style.display = 'none';
+  box.innerHTML = '';
+}
+
+function renderTextTemplatePreview(templateName, preview={}) {
+  const box = document.getElementById('text-template-preview');
+  if (!box) return;
+ 
+  const imgs  = Array.isArray(preview.header_images) ? preview.header_images.filter(Boolean).slice(0, 2) : [];
+  const headerLines = Array.isArray(preview.header_lines) ? preview.header_lines.filter(Boolean).slice(0, 4) : [];
+  const lines = headerLines;
+ 
+  const imgHtml = imgs.length
+    ? `<div style="display:grid;gap:8px;margin-bottom:8px">${
+        imgs.map(src =>
+          `<img src="${src}" style="display:block;width:100%;max-height:150px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:8px">`
+        ).join('')
+      }</div>`
+    : '';
+ 
+  const headerHtml = lines.length ? `<div style="background:#f8fafc;border-left:3px solid var(--accent);padding:8px 10px;margin-bottom:10px;border-radius:6px;font-size:11px;color:#475569;line-height:1.7">${lines.map(ln => `<div>${escapeHtml(ln)}</div>`).join('')}</div>` : '';
+ 
+  box.style.display = '';
+  box.innerHTML = `
+    <div style="font-size:11px;color:var(--text3);margin-bottom:6px">
+      معاينة مباشرة للكلشية: <strong>${escapeHtml(templateName)}</strong>
+    </div>
+    <div id="kliche-live-preview" style="
+        border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;
+        background:#fff;color:#1f2937;
+        font-family:'IBM Plex Sans Arabic',Arial,sans-serif;direction:rtl;font-size:13px;line-height:1.8;padding:12px 14px">
+      ${imgHtml}
+      ${headerHtml}
+      <div id="kliche-content-preview" style="min-height:50px;color:#334155">
+        <span style="color:#94a3b8;font-style:italic">✏️ ابدأ الكتابة لترى النص هنا مباشرة...</span>
+      </div>
+    </div>`;
+ 
+  _bindLivePreview();
+}
+
+/* ─── 2. ربط المحرر بالمعاينة في الوقت الفعلي ──────────── */
+function _bindLivePreview() {
+  const editor  = document.getElementById('doc-content-editor');
+  const previewEl = () => document.getElementById('kliche-content-preview');
+  if (!editor) return;
+ 
+  if (editor._liveHandler) {
+    editor.removeEventListener('input', editor._liveHandler);
+  }
+ 
+  editor._liveHandler = function() {
+    const el   = previewEl();
+    if (!el) return;
+    const text = editor.innerText || '';
+    if (!text.trim()) {
+      el.innerHTML = '<span style="color:#94a3b8;font-style:italic">✏️ ابدأ الكتابة لترى النص هنا مباشرة...</span>';
+    } else {
+      el.innerHTML = sanitizeRichHtml(editor.innerHTML || '');
+    }
+  };
+ 
+  editor.addEventListener('input', editor._liveHandler);
+  editor._liveHandler();
+}
+ 
+/* ─── 3. تحميل معاينة القالب (يستدعى عند اختيار قالب) ──── */
+async function loadTextTemplatePreview(templateName='') {
+  const box = document.getElementById('text-template-preview');
+  if (!box) return;
+ 
+  if (!templateName) {
+    setTemplateEditorMode(false);
+    hideTextTemplatePreview();
+    const editor = document.getElementById('doc-content-editor');
+    if (editor && editor._liveHandler) {
+      editor.removeEventListener('input', editor._liveHandler);
+    }
+    return;
+  }
+ 
+  box.style.display = '';
+  box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3)">⏳ جارٍ تحميل الكلشية...</div>';
+
+  try {
+    const preview = await getDocxTemplatePreviewData(templateName);
+    renderTextTemplatePreview(templateName, preview);
+    setTemplateEditorMode(true);
+  } catch {
+    setTemplateEditorMode(false);
+    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--red)">⚠️ تعذر تحميل معاينة الكلشية</div>';
+  }
+}
+
+async function getDocxTemplatePreviewData(templateName=''){
+  const name = String(templateName || '').trim();
+  if(!name) return {};
+
+  if(docxTemplatePreviewCache.has(name)){
+    return docxTemplatePreviewCache.get(name) || {};
+  }
+
+  const res  = await fetch(`/api/docx-templates/${encodeURIComponent(name)}/preview`, {
+    headers: { 'Accept': 'application/json' }
+  });
+  const data = await res.json();
+  if(!res.ok || !data.success){
+    throw new Error(data.error || 'خطأ');
+  }
+
+  const preview = data.preview || {};
+  docxTemplatePreviewCache.set(name, preview);
+  return preview;
+}
+ 
+
+async function loadDocxTemplates(forceSelect=''){
+  const select = document.getElementById('text-template-select');
+  const meta = document.getElementById('text-template-meta');
+  if(!select) return;
+
+  try {
+    const res = await fetch('/api/docx-templates', {headers:{'Accept':'application/json'}});
+    const data = await res.json();
+    docxTemplates = Array.isArray(data) ? data : [];
+  } catch {
+    docxTemplates = [];
+  }
+
+  select.innerHTML = '<option value="">بدون قالب (نص فقط)</option>' +
+    docxTemplates.map(item => `<option value="${item.file_name}">${item.file_name} • ${item.updated_at||'—'}</option>`).join('');
+
+  const fallbackDefault = (docxTemplates.find(item => item.is_default)?.file_name || '');
+  const remembered = forceSelect || selectedTextTemplateName || getPreferredTemplateName() || fallbackDefault;
+  if(remembered && docxTemplates.some(item => item.file_name === remembered)){
+    select.value = remembered;
+    selectedTextTemplateName = remembered;
+  } else {
+    select.value = '';
+    selectedTextTemplateName = '';
+  }
+
+  if(meta) {
+    if(selectedTextTemplateName){
+      const item = docxTemplates.find(i => i.file_name === selectedTextTemplateName);
+      meta.textContent = item
+        ? `القالب المختار: ${item.file_name} (${item.size_kb||0} KB)`
+        : 'يمكنك رفع عدة قوالب DOCX واختيار واحد منها';
+    } else {
+      meta.textContent = 'يمكنك رفع عدة قوالب DOCX واختيار واحد منها';
+    }
+  }
+
+  loadTextTemplatePreview(selectedTextTemplateName);
+}
+
+function onTextTemplateChange(){
+  const select = document.getElementById('text-template-select');
+  const meta = document.getElementById('text-template-meta');
+  selectedTextTemplateName = select ? (select.value || '') : '';
+
+  try { localStorage.setItem(DOCX_TEMPLATE_STORAGE_KEY, selectedTextTemplateName); } catch {}
+
+  if(meta){
+    if(!selectedTextTemplateName){
+      meta.textContent = 'يمكنك رفع عدة قوالب DOCX واختيار واحد منها';
+    } else {
+      const item = docxTemplates.find(i => i.file_name === selectedTextTemplateName);
+      meta.textContent = item
+        ? `القالب المختار: ${item.file_name} (${item.size_kb||0} KB)`
+        : `القالب المختار: ${selectedTextTemplateName}`;
+    }
+  }
+
+  loadTextTemplatePreview(selectedTextTemplateName);
+}
+
+async function textTemplateSelected(){
+  const input = document.getElementById('text-template-input');
+  const f = input.files[0];
+  if(!f) return;
+
+  const ext = getFileExt(f.name);
+  if(ext !== 'docx'){
+    input.value = '';
+    return toast('القالب يجب أن يكون بصيغة DOCX','error');
+  }
+
+  if(f.size > 10*1024*1024){
+    input.value = '';
+    return toast('حجم القالب أكبر من 10MB','error');
+  }
+
+  const fd = new FormData();
+  fd.append('template', f);
+  try {
+    const res = await fetch('/api/docx-templates', {method:'POST', body:fd});
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      input.value = '';
+      return toast(data.error || 'فشل رفع القالب','error');
+    }
+
+    if(data.template?.file_name){
+      docxTemplatePreviewCache.delete(data.template.file_name);
+    }
+
+    await loadDocxTemplates(data.template?.file_name || '');
+    onTextTemplateChange();
+    toast('تم حفظ القالب في مجلد القوالب');
+  } catch {
+    toast('فشل رفع القالب','error');
+  } finally {
+    input.value = '';
+  }
+}
+
+function clearTextTemplate(){
+  const input = document.getElementById('text-template-input');
+  if(input) input.value = '';
+}
+
+// mention
+async function loadUsers(){
+  try {
+    const res = await fetch('/api/users/mentions', {headers:{'Accept':'application/json'}});
+    const data = await res.json();
+    allUsers = Array.isArray(data) ? data : [];
+  } catch {
+    allUsers = [];
+  }
+}
+function searchMentions(){
+  const input = document.getElementById('mention-search');
+  const q = (input?.value || '').toLowerCase().trim();
+  const el = document.getElementById('mention-list');
+  const users = Array.isArray(allUsers) ? allUsers : [];
+  if(!users.length){
+    el.innerHTML = `<div class="mention-item" style="cursor:default;opacity:.75">لا يوجد مستخدمون متاحون حالياً</div>`;
+    el.style.display='';
+    return;
+  }
+
+  const filtered = users.filter(u=>
+    (
+      !q
+      || u.name.toLowerCase().includes(q)
+      || u.email.toLowerCase().includes(q)
+      || (mentionRoleLabels[u.role] || u.role || '').toLowerCase().includes(q)
+    ) &&
+    !mentionedUsers.find(m=>m.id===u.id)
+  );
+  const matches = q ? filtered.slice(0, 20) : filtered;
+
+  if(!matches.length){
+    el.innerHTML = `<div class="mention-item" style="cursor:default;opacity:.75">لا توجد نتائج مطابقة</div>`;
+    el.style.display='';
+    return;
+  }
+
+  el.innerHTML=matches.map(u=>`
+    <div class="mention-item" onclick='addMention(${u.id}, ${JSON.stringify(u.name)}, ${JSON.stringify(u.role)})'>
+      <div class="mention-av">${u.name[0]}</div>
+      <div><div class="mention-name">${u.name}</div><div class="mention-role">${mentionRoleLabels[u.role]||u.role} • ${u.email}</div></div>
+    </div>`).join('');
+  el.style.display='';
+}
+
+function openMentionList(){
+  searchMentions();
+}
+function addMention(id,name,role){
+  if(mentionedUsers.find(m=>m.id===id)) return;
+  mentionedUsers.push({id,name,role});
+  document.getElementById('mention-search').value='';
+  renderChips();
+  searchMentions();
+}
+function removeMention(id){
+  mentionedUsers=mentionedUsers.filter(m=>m.id!==id);
+  renderChips();
+  searchMentions();
+}
+function renderChips(){
+  document.getElementById('mentions-chips').innerHTML=mentionedUsers.map(m=>`
+    <span class="mention-chip">${m.name}<button onclick="removeMention(${m.id})">×</button></span>`).join('');
+}
+
+// إنشاء وثيقة
+async function createDoc(){
+  const title = document.getElementById('doc-title').value.trim();
+  if(!title) return toast('أدخل عنوان الوثيقة','error');
+
+  const archiveSectionIdInput = document.getElementById('doc-archive-section-id');
+  const archiveSectionId = (archiveSectionIdInput?.value || '').trim();
+  const archiveSectionInput = document.getElementById('doc-archive-section');
+  const archiveSectionCodeInput = document.getElementById('doc-archive-section-code');
+  const archiveSection = (archiveSectionInput?.value || '').trim();
+  const archiveSectionCode = (archiveSectionCodeInput?.value || '').trim().toUpperCase();
+
+  const btn = document.getElementById('create-btn');
+  btn.disabled=true; btn.textContent='جارٍ الإنشاء...';
+
+  const fd = new FormData();
+  fd.append('title', title);
+  fd.append('archive_section_id', archiveSectionId);
+  fd.append('archive_section', archiveSection);
+  fd.append('archive_section_code', archiveSectionCode);
+  fd.append('note', document.getElementById('doc-note').value.trim());
+  fd.append('mentions', JSON.stringify(mentionedUsers.map(m=>m.id)));
+  fd.append('doc_mode', currentDocType);
+
+  const isUpload = currentDocType === 'upload';
+  if(isUpload){
+    if(!selectedFile){btn.disabled=false;btn.textContent='إنشاء وإرسال';return toast('اختر ملفاً','error');}
+    fd.append('file', selectedFile);
+    // progress
+    document.getElementById('upload-prog').style.display='';
+    animateBar();
+  } else {
+    const contentText = getEditorPlainText();
+    if(!contentText){btn.disabled=false;btn.textContent='إنشاء وإرسال';return toast('أدخل محتوى الوثيقة','error');}
+    fd.append('content', getEditorContentHtml());
+    if(selectedTextTemplateName){
+      fd.append('text_template_name', selectedTextTemplateName);
+    }
+  }
+
+  let res, data;
+  try {
+    res  = await fetch('/api/documents',{method:'POST',body:fd});
+    try { data = await res.json(); }
+    catch { data = {success:false, error:'خطأ في المخدم — حاول مجدداً'}; }
+  } catch(netErr) {
+    btn.disabled=false; btn.textContent='إنشاء وإرسال';
+    document.getElementById('upload-prog').style.display='none';
+    return toast('تعذر الاتصال بالمخدم — تحقق من الاتصال','error');
+  }
+  btn.disabled=false; btn.textContent='إنشاء وإرسال';
+  document.getElementById('upload-prog').style.display='none';
+
+  if(data.success){
+    closeModal('new-doc-modal');
+    toast(`تم الإنشاء — ${data.archive_number}`);
+    if(data.warning){
+      toast(`${data.warning}`,'error');
+    }
+    resetForm();
+    loadDocs();
+  } else toast(data.error||'فشل الإنشاء','error');
+}
+
+function animateBar(){
+  let p=0; const bar=document.getElementById('upload-bar');
+  const t=setInterval(()=>{p+=Math.random()*15;if(p>90){clearInterval(t);}bar.style.width=Math.min(p,90)+'%';},200);
+}
+
+function resetForm(){
+  document.getElementById('doc-title').value='';
+  const archiveSectionIdInput = document.getElementById('doc-archive-section-id');
+  const archiveSectionInput = document.getElementById('doc-archive-section');
+  const archiveSectionCodeInput = document.getElementById('doc-archive-section-code');
+  if(archiveSectionIdInput) archiveSectionIdInput.value = archiveSectionIdInput.dataset.defaultValue || archiveSectionIdInput.value || '';
+  if(archiveSectionInput) archiveSectionInput.value = archiveSectionInput.dataset.defaultValue || archiveSectionInput.value || 'عام';
+  if(archiveSectionCodeInput) archiveSectionCodeInput.value = archiveSectionCodeInput.dataset.defaultValue || archiveSectionCodeInput.value || 'GN';
+  syncDocArchiveSectionSelection();
+  document.getElementById('doc-note').value='';
+  const createEditor = document.getElementById('doc-content-editor');
+  if(createEditor){
+    createEditor.innerHTML='';
+    createEditor.dataset.templateSource = '';
+    createEditor.dataset.templateAuto = '0';
+  }
+  setTemplateEditorMode(false);
+  hideTextTemplatePreview();
+  document.getElementById('file-name').style.display='none';
+  document.getElementById('file-input').value='';
+  selectedFile=null; mentionedUsers=[];
+  clearTextTemplate();
+  document.getElementById('mention-search').value='';
+  document.getElementById('mention-list').style.display='';
+  document.getElementById('mentions-chips').innerHTML='';
+  document.getElementById('upload-bar').style.width='0';
+
+  const preferredType = getPreferredDocType();
+  const preferredBtn = document.querySelector(`.dtype-btn[data-dtype="${preferredType}"]`);
+  if(preferredBtn) setDocType(preferredType, preferredBtn);
+}
+
+// عرض وثيقة
+async function viewDoc(id){
+  currentDocId = id;
+  currentSignUrl = null;
+  let d = null;
+  let sigs = [];
+  try {
+    const res = await fetch(`/api/documents/${id}?_=${Date.now()}`, {headers:{'Accept':'application/json'}, cache:'no-store'});
+    if(!res.ok) throw new Error(`doc status ${res.status}`);
+    d = await res.json();
+    currentDocData = d;
+
+    const sres = await fetch(`/api/documents/${id}/signatures?_=${Date.now()}`, {headers:{'Accept':'application/json'}, cache:'no-store'});
+    if(!sres.ok) throw new Error(`signatures status ${sres.status}`);
+    sigs = await sres.json();
+  } catch (err) {
+    console.error('viewDoc failed', err);
+    toast('تعذر تحميل بيانات الوثيقة الآن، حاول مرة أخرى', 'error');
+    return;
+  }
+
+  let previewHtml = '<div class="doc-preview-box"><div class="doc-preview-empty">لا يوجد ملف مرفق لهذه الوثيقة</div></div>';
+  let isPdfDoc = false;
+  let textTemplatePreview = {};
+  const templateName = String(d.template_name || '').trim();
+  const isPdfTemplate = templateName.toLowerCase().endsWith('.pdf');
+  if(!d.file_path && templateName && !isPdfTemplate){
+    try {
+      textTemplatePreview = await getDocxTemplatePreviewData(templateName);
+    } catch (err) {
+      console.warn('template preview unavailable for text doc', err);
+    }
+  }
+  const inlineDownloadUrl = getDocInlineDownloadUrl(d);
+  if(d.file_path){
+    const ext = getFileExt(d.file_path);
+    if(['png','jpg','jpeg','gif','webp'].includes(ext)){
+      previewHtml = `<div class="doc-preview-box"><img src="${inlineDownloadUrl}" alt="${d.title}" onerror="this.onerror=null;this.outerHTML='<div class=\\'doc-preview-empty\\'>تعذر تحميل المعاينة</div>'"></div>`;
+    } else if(ext === 'pdf'){
+      isPdfDoc = true;
+      previewHtml = `<div class="doc-preview-box"><img src="/api/documents/${id}/preview?page=0&t=${Date.now()}" alt="${d.title}" onerror="this.onerror=null;this.outerHTML='<div class=\\'doc-preview-empty\\'>تعذر تحميل معاينة PDF الآن — استخدم زر التحميل</div>'"></div>`;
+    } else if(ext === 'docx'){
+      previewHtml = `<div class="doc-preview-box"><iframe src="/api/documents/${id}/preview-office" title="${d.title}"></iframe></div>`;
+    } else if(ext === 'doc'){
+      previewHtml = `<div class="doc-preview-box"><iframe src="/api/documents/${id}/preview-office" title="${d.title}"></iframe></div>`;
+    } else {
+      previewHtml = '<div class="doc-preview-box"><div class="doc-preview-empty">المعاينة المصغرة غير مدعومة لهذا النوع — استخدم زر التحميل</div></div>';
+    }
+  }
+  // PDF-template text docs: show the actual generated PDF in an iframe
+  const pdfTemplateHtml = (!d.file_path && d.content_json && isPdfTemplate)
+    ? `<div class="doc-preview-box" style="min-height:82vh;max-height:none;display:flex;flex-direction:column;overflow:hidden;padding:0"><iframe src="/api/documents/${id}/download?inline=1&_=${Date.now()}" style="flex:1;width:100%;min-height:82vh;border:none;display:block;background:#fff" title="${escapeHtml(d.title)}"></iframe></div>`
+    : '';
+  // Toggle pdf-view-mode on modal for more vertical space
+  const _viewModal = document.querySelector('#view-doc-modal .modal');
+  if(_viewModal) _viewModal.classList.toggle('pdf-view-mode', !!(pdfTemplateHtml || isPdfDoc));
+  const textDocHtml = isPdfTemplate ? '' : buildTextDocHtml(d, textTemplatePreview);
+  const mainContentHtml = d.file_path ? previewHtml : (pdfTemplateHtml || textDocHtml || previewHtml);
+
+  const vt = document.getElementById('view-content');
+  vt.innerHTML=`
+    <div class="doc-view-header">
+      <div class="doc-view-title">${d.title}</div>
+      <div class="doc-meta">
+        <div class="doc-meta-item"><i class="fa-solid fa-box-archive"></i> <strong>${d.archive_number||'—'}</strong></div>
+        <div class="doc-meta-item"><i class="fa-solid fa-layer-group"></i> <strong>${d.archive_section||'عام'} (${d.archive_section_code||'GN'})</strong></div>
+        <div class="doc-meta-item"><i class="fa-regular fa-calendar"></i> <strong>${(d.created_at||'').replace('T',' ').slice(0,16)}</strong></div>
+        ${d.needs_sign ? '<div class="doc-meta-item"><i class="fa-solid fa-signature"></i> <strong style="color:var(--accent)">يحتاج توقيعك</strong></div>' : ''}
+        <div class="doc-meta-item">حالة: <span class="badge ${statusMap[d.status]}">${statusLabel[d.status]}</span></div>
+      </div>
+    </div>
+    ${d.needs_sign ? '<div style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px 12px;font-size:12px;font-weight:700;margin-bottom:12px"><i class="fa-solid fa-signature"></i> هذا المستند بانتظار توقيعك</div>' : ''}
+    ${mainContentHtml}
+    ${d.notes?`<div style="background:var(--gold-dim);border:1px solid rgba(232,168,48,.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--gold);margin-bottom:14px"><i class="fa-solid fa-note-sticky"></i> ${d.notes}</div>`:''}
+    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">سجل التوقيعات والاعتماد</div>
+    ${sigs.length?`<div class="sign-timeline">
+      ${sigs.map(s=>{
+        const isApprovalEntry = s.entry_type === 'approval';
+        const dt = (isApprovalEntry ? (s.event_at || '') : (s.signed_at || '')).replace('T',' ').slice(0,16);
+        const name = isApprovalEntry
+          ? `${s.action_label || 'إجراء اعتماد'} — ${s.signer_name || '—'}`
+          : (s.signer_name || '—');
+        const meta = isApprovalEntry
+          ? `<i class="fa-regular fa-calendar"></i> ${dt || '—'}`
+          : `${s.serial_number || '—'} • ${s.status==='signed' ? (dt || '—') : 'بانتظار التوقيع'}`;
+
+        return `<div class="sign-item ${s.status}">
+          <div class="sign-name">${name}</div>
+          <div class="sign-meta">${meta}</div>
+        </div>`;
+      }).join('')}
+    </div>`:'<div style="font-size:13px;color:var(--text3)">لا توجد سجلات بعد</div>'}`;
+
+  document.getElementById('dl-btn').style.display = canDownloadDoc(d)?'':'none';
+  // Update download button label
+  const dlBtn = document.getElementById('dl-btn');
+  if(dlBtn){
+    if(isPdfDoc || (!d.file_path && isPdfTemplate)){
+      dlBtn.innerHTML = '<i class="fa-solid fa-file-pdf"></i> تحميل PDF';
+    } else {
+      dlBtn.innerHTML = '<i class="fa-solid fa-download"></i> تحميل';
+    }
+  }
+  document.getElementById('convert-btn').style.display = (d.file_path && !isPdfDoc && d.status!=='archived')?'':'none';
+  const editBtn = document.getElementById('edit-btn');
+  if(editBtn){
+    editBtn.style.display = (d.can_edit_text && d.status !== 'approved') ? '' : 'none';
+  }
+  const signBtn = document.getElementById('sign-btn');
+  const canSignByRequest = !!(d.needs_sign && d.pending_sign_request_id);
+  const canSignDirect = !!d.can_sign_direct;
+  if(d.status!=='approved' && (canSignByRequest || canSignDirect)){
+    currentSignUrl = canSignByRequest ? `/sign/${d.pending_sign_request_id}` : `/sign/doc/${currentDocId}`;
+    signBtn.style.display = '';
+    signBtn.innerHTML = canSignByRequest ? '<i class="fa-solid fa-signature"></i> وقّع المطلوب' : '<i class="fa-solid fa-signature"></i> توقيع وختم';
+  } else {
+    currentSignUrl = null;
+    signBtn.style.display = 'none';
+    signBtn.innerHTML = '<i class="fa-solid fa-signature"></i> توقيع وختم';
+  }
+  document.getElementById('delete-btn').style.display = d.can_delete ? '' : 'none';
+  {% if session.get('user_role') in ['admin','manager'] %}
+  const canApprove = !!d.can_approve;
+  document.getElementById('approve-btn').style.display = (d.status==='pending' && canApprove)?'':'none';
+  document.getElementById('reject-btn').style.display  = (d.status==='pending' && canApprove)?'':'none';
+
+  const prevRuleNote = document.getElementById('approve-rule-note');
+  if(prevRuleNote) prevRuleNote.remove();
+  if(d.status==='pending' && !canApprove){
+    const note = document.createElement('div');
+    note.id = 'approve-rule-note';
+    note.style.cssText = 'background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#fcd34d;border-radius:8px;padding:10px 12px;font-size:12px;margin-top:10px';
+    note.textContent = 'معلومة: زر الاعتماد يظهر فقط إذا كان هذا المستند ضمن صلاحيات اعتمادك.';
+    vt.appendChild(note);
+  }
+  {% endif %}
+  openModal('view-doc-modal');
+}
+
+function downloadDoc(){
+  if(!currentDocData || !currentDocData.id) return;
+  window.open(getDocDownloadBase(currentDocData),'_blank');
+}
+function printDoc(){
+  if(!currentDocData || !currentDocData.id) return;
+  window.open('/api/documents/' + currentDocData.id + '/print','_blank');
+}
+function goSign(){
+  if(!currentSignUrl) return;
+  closeModal('view-doc-modal');
+  window.location = currentSignUrl;
+}
+
+function openEditDoc(){
+  if(!currentDocData || !currentDocData.can_edit_text || currentDocData.status === 'approved') return;
+
+  document.getElementById('edit-doc-title').value = currentDocData.title || '';
+  document.getElementById('edit-doc-note').value = currentDocData.notes || '';
+  const editor = document.getElementById('edit-doc-content-editor');
+  if(editor){
+    const content = (currentDocData.content_json || '').trim();
+    editor.innerHTML = sanitizeRichHtml(content);
+  }
+
+  openModal('edit-doc-modal');
+}
+
+async function saveDocEdit(){
+  if(!currentDocId) return;
+
+  const title = (document.getElementById('edit-doc-title').value || '').trim();
+  const note = (document.getElementById('edit-doc-note').value || '').trim();
+  const contentText = getEditEditorPlainText();
+  if(!title) return toast('عنوان الوثيقة مطلوب','error');
+  if(!contentText) return toast('محتوى الوثيقة مطلوب','error');
+
+  const btn = document.getElementById('save-edit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-hourglass-half"></i> جارٍ الحفظ...';
+
+  try {
+    const res = await fetch(`/api/documents/${currentDocId}`, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json', 'Accept':'application/json'},
+      body: JSON.stringify({
+        title,
+        note,
+        content: getEditEditorContentHtml()
+      })
+    });
+    const data = await res.json();
+    if(res.ok && data.success){
+      closeModal('edit-doc-modal');
+      toast(data.regenerated ? 'تم حفظ التعديل وإعادة بناء الملف بنفس القالب' : 'تم حفظ التعديل');
+      await loadDocs();
+      await viewDoc(currentDocId);
+      return;
+    }
+    toast(data.error || 'فشل حفظ التعديل', 'error');
+  } catch {
+    toast('فشل حفظ التعديل', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> حفظ التعديلات';
+  }
+}
+
+async function archiveDoc(){
+  if(!currentDocId) return;
+  const ok = confirm('سيتم نقل المستند إلى الأرشيف أولاً وإخفاؤه من قائمة الوثائق. المتابعة؟');
+  if(!ok) return;
+
+  const btn = document.getElementById('delete-btn');
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = 'جارٍ الأرشفة...';
+  }
+
+  try {
+    const res = await fetch(`/api/documents/${currentDocId}`, {
+      method: 'DELETE',
+      headers: {'Accept':'application/json'}
+    });
+    const data = await res.json();
+    if(res.ok && data.success){
+      closeModal('view-doc-modal');
+      if(data.already_archived){
+        toast('المستند مؤرشف مسبقًا');
+      } else if(data.saved_to_storage){
+        toast('تم نقل المستند إلى الأرشيف وحفظه في التخزين');
+      } else {
+        toast('تم نقل المستند إلى الأرشيف');
+      }
+      if(data.warning){
+        toast(`${data.warning}`,'error');
+      }
+      await loadDocs();
+    } else {
+      toast(data.error || 'فشل نقل المستند إلى الأرشيف', 'error');
+    }
+  } catch {
+    toast('فشل نقل المستند إلى الأرشيف', 'error');
+  } finally {
+    if(btn){
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-box-archive"></i> حذف للأرشيف';
+    }
+  }
+}
+
+async function convertDocToPdf(){
+  if(!currentDocId) return;
+  const btn = document.getElementById('convert-btn');
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = 'جاري التحويل...';
+  }
+
+  try {
+    const res = await fetch(`/api/documents/${currentDocId}/convert-pdf`, {
+      method:'POST',
+      headers:{'Accept':'application/json'}
+    });
+    const data = await res.json();
+    if(res.ok && data.success){
+      toast(data.already_pdf ? 'الملف PDF بالفعل' : 'تم التحويل إلى PDF');
+      if(data.warning){
+        toast(`${data.warning}`,'error');
+      }
+      await loadDocs();
+      await viewDoc(currentDocId);
+    } else {
+      toast(data.error || 'فشل التحويل إلى PDF','error');
+    }
+  } catch {
+    toast('فشل التحويل إلى PDF','error');
+  } finally {
+    if(btn){
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-rotate"></i> تحويل PDF';
+    }
+  }
+}
+
+{% if session.get('user_role') in ['admin','manager'] %}
+async function approveDoc(){
+  const reason = '';
+  const res  = await fetch(`/api/documents/${currentDocId}/approve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+  const data = await res.json();
+  if(data.success){closeModal('view-doc-modal');toast('تم الاعتماد');loadDocs();}
+  else toast(data.error,'error');
+}
+async function rejectDoc(){
+  const reason = prompt('سبب الرفض (اختياري):');
+  if(reason===null) return;
+  const res  = await fetch(`/api/documents/${currentDocId}/reject`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason})});
+  const data = await res.json();
+  if(data.success){closeModal('view-doc-modal');toast('تم الرفض');loadDocs();}
+  else toast(data.error,'error');
+}
+{% endif %}
+
+applyPreferredDocType();
+loadDocxTemplates();
+loadDocArchiveSections();
+loadDocs();
+loadUsers();
+</script>
+{% endblock %}

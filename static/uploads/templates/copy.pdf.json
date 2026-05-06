@@ -1,0 +1,25 @@
+{
+  "archive_number": {
+    "font_size": 13,
+    "x": 0.86,
+    "y": 0.12
+  },
+  "content": {
+    "font_size": 14,
+    "line_height": 32,
+    "x_left": 0.08,
+    "x_right": 0.86,
+    "y_end": 0.52,
+    "y_start": 0.21
+  },
+  "date": {
+    "font_size": 13,
+    "x": 0.86,
+    "y": 0.15
+  },
+  "qr": {
+    "size": 0.09,
+    "x": 0.5,
+    "y": 0.9
+  }
+}

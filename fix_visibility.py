@@ -1,0 +1,10 @@
+﻿import sqlite3
+c = sqlite3.connect('/var/www/project/najm.db')
+cur = c.cursor()
+cur.execute("UPDATE stamp_assets SET visibility_scope='self', visible_to_user_id=NULL WHERE is_active=1 AND COALESCE(visibility_scope,'') IN ('all','managers','')")
+cur.execute("UPDATE signature_assets SET visibility_scope='self', visible_to_user_id=NULL WHERE is_active=1 AND COALESCE(visibility_scope,'') IN ('all','managers','')")
+c.commit()
+print('stamp:', cur.execute("SELECT visibility_scope, COUNT(*) FROM stamp_assets WHERE is_active=1 GROUP BY visibility_scope").fetchall())
+print('sig:', cur.execute("SELECT visibility_scope, COUNT(*) FROM signature_assets WHERE is_active=1 GROUP BY visibility_scope").fetchall())
+c.close()
+print('done')

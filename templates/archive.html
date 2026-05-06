@@ -1,0 +1,969 @@
+{% extends "base.html" %}
+{% block title %}الأرشيف{% endblock %}
+{% block page_title %}الأرشيف{% endblock %}
+{% block page_sub %}جميع الوثائق المحفوظة في نظامك{% endblock %}
+
+{% block extra_css %}
+<style>
+.arch-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.arch-stat{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .2s}
+.arch-stat:hover{border-color:var(--accent);transform:translateY(-1px)}
+.arch-stat.active-filter{border-color:var(--accent);background:var(--accent-dim)}
+.arch-stat-icon{font-size:22px}
+.arch-stat-val{font-size:22px;font-weight:800}
+.arch-stat-lbl{font-size:10px;color:var(--text3);margin-top:1px}
+
+.arch-filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.arch-filters input,.arch-filters select{background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:8px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;direction:rtl}
+.arch-filters input{flex:1;min-width:200px}
+.arch-filters input:focus,.arch-filters select:focus{border-color:var(--accent)}
+
+.arch-card{background:var(--surface);border:1px solid var(--border2);border-radius:13px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;transition:all .2s;cursor:pointer}
+.arch-card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.16)}
+.arch-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.arch-body{flex:1;min-width:0}
+.arch-title{font-size:14px;font-weight:700;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.arch-num{font-size:10px;color:var(--accent);font-family:monospace;margin-bottom:5px}
+.arch-meta{display:flex;gap:12px;flex-wrap:wrap}
+.arch-meta-item{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px}
+.arch-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.arch-actions{display:flex;gap:6px;margin-top:2px}
+.arch-btn{background:var(--card2);border:1px solid var(--border2);border-radius:7px;padding:4px 10px;font-size:11px;color:var(--text);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;transition:all .15s;white-space:nowrap}
+.arch-btn:hover{border-color:var(--accent);color:var(--accent)}
+.arch-btn:disabled{opacity:.55;cursor:not-allowed}
+
+.arch-scope-banner{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.scope-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:var(--accent-dim);color:var(--accent);font-size:12px;font-weight:700;border:1px solid rgba(166,90,42,.22)}
+
+.storage-shell{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:18px}
+.storage-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.storage-actions{display:flex;gap:8px;flex-wrap:wrap}
+.storage-path{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px dashed var(--border2);font-size:11px;color:var(--accent);font-family:monospace;direction:ltr;text-align:left;word-break:break-all}
+.storage-meta-bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.storage-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--card2);border:1px solid var(--border2);font-size:11px;color:var(--text2)}
+.storage-browser{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:14px}
+.storage-item{background:var(--surface);border:1px solid var(--border2);border-radius:13px;padding:12px;display:flex;gap:10px;align-items:flex-start;transition:all .18s}
+.storage-item.folder{cursor:pointer}
+.storage-item.folder:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.16)}
+.storage-item-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px}
+.storage-item.folder .storage-item-icon{background:rgba(166,90,42,.14);color:var(--accent)}
+.storage-item.file .storage-item-icon{background:rgba(148,163,184,.12);color:var(--text2)}
+.storage-item-body{min-width:0;flex:1}
+.storage-item-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.storage-item-sub{font-size:11px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap}
+.storage-empty{grid-column:1/-1;padding:28px 14px;border:1px dashed var(--border2);border-radius:13px;text-align:center;color:var(--text3);background:var(--surface)}
+.storage-files-wrap{grid-column:1/-1;display:flex;flex-direction:column;gap:10px}
+.storage-files-title{font-size:12px;color:var(--text3);margin:2px 2px 0}
+.storage-doc-card{margin-bottom:0}
+
+.qr-popup{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);z-index:300;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.qr-popup.open{opacity:1;pointer-events:all}
+.qr-box{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:28px;text-align:center;max-width:320px;width:90%;transform:scale(.92);transition:transform .25s}
+.qr-popup.open .qr-box{transform:scale(1)}
+.qr-img-wrap{width:150px;height:150px;border-radius:12px;background:#fff;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;padding:10px}
+.qr-img-wrap img{width:130px;height:130px}
+
+.detail-drawer{position:fixed;inset:0;z-index:250;display:flex;pointer-events:none;direction:ltr}
+.detail-backdrop{flex:1;background:rgba(0,0,0,.5);opacity:0;transition:opacity .3s}
+.detail-panel{width:420px;max-width:95vw;background:var(--surface);border-right:1px solid var(--border2);height:100%;overflow-y:auto;transform:translateX(100%);transition:transform .3s;pointer-events:all;padding:24px}
+.detail-drawer.open .detail-backdrop{opacity:1;pointer-events:all}
+.detail-drawer.open .detail-panel{transform:translateX(0)}
+.detail-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border)}
+.detail-row:last-child{border-bottom:none}
+.detail-lbl{font-size:11px;color:var(--text3);width:95px;flex-shrink:0;margin-top:2px}
+.detail-val{font-size:13px;flex:1}
+.tl-item{display:flex;gap:10px;align-items:flex-start;padding:8px 0}
+.tl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+
+/* Section cards grid */
+.sec-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:10px}
+.sec-card{background:var(--surface);border:1px solid var(--border2);border-radius:13px;padding:12px;cursor:pointer;transition:all .18s;display:flex;align-items:flex-start;gap:10px;text-align:right}
+.sec-card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.16)}
+.sec-card-icon{width:38px;height:38px;border-radius:10px;background:rgba(166,90,42,.14);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;margin:0}
+.sec-card-body{min-width:0;flex:1}
+.sec-card-name{font-size:13px;font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sec-card-meta{font-size:11px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap}
+.sec-card-code{font-size:11px;color:var(--accent);font-family:monospace}
+.sec-card-count{font-size:11px;color:var(--text3)}
+
+/* Section doc header bar */
+.sec-doc-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.sec-doc-bar-title{font-size:14px;font-weight:700;flex:1}
+
+/* @media print */
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body *{visibility:hidden!important}
+  #print-table-wrap,#print-table-wrap *{visibility:visible!important}
+  #print-table-wrap{position:fixed;inset:0;padding:10mm 8mm 8mm 16mm;background:#fff;z-index:9999;direction:rtl;overflow:visible}
+  #print-table-wrap h2{font-size:16px;margin-bottom:12px;font-family:Arial,sans-serif}
+  #print-table-wrap table{width:calc(100% - 8mm);margin-right:8mm;border-collapse:collapse;font-family:Arial,sans-serif;table-layout:fixed}
+  #print-table-wrap th,#print-table-wrap td{border:1px solid #ccc;padding:6px 7px;font-size:10px;text-align:right;word-break:break-word;white-space:normal}
+  #print-table-wrap th{background:#f0f0f0;font-weight:700}
+  #print-table-wrap .pt-approved{color:#059669;font-weight:700}
+  #print-table-wrap .pt-draft{color:#64748b}
+  #print-table-wrap .pt-pending{color:#d97706;font-weight:700}
+  #print-table-wrap .pt-rejected{color:#dc2626}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="arch-stats">
+  <div class="arch-stat" onclick="filterByStatus('')" id="stat-all">
+    <div class="arch-stat-icon"><i class="fa-solid fa-box-archive"></i></div>
+    <div><div class="arch-stat-val" id="s-total" style="color:var(--accent)">—</div><div class="arch-stat-lbl">إجمالي الوثائق</div></div>
+  </div>
+  <div class="arch-stat" onclick="filterByStatus('approved')" id="stat-approved">
+    <div class="arch-stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+    <div><div class="arch-stat-val" id="s-approved" style="color:var(--green)">—</div><div class="arch-stat-lbl">معتمدة</div></div>
+  </div>
+  <div class="arch-stat" onclick="filterByStatus('pending')" id="stat-pending">
+    <div class="arch-stat-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+    <div><div class="arch-stat-val" id="s-pending" style="color:var(--gold)">—</div><div class="arch-stat-lbl">قيد المراجعة</div></div>
+  </div>
+  <div class="arch-stat" onclick="filterByStatus('draft')" id="stat-draft">
+    <div class="arch-stat-icon"><i class="fa-solid fa-file-pen"></i></div>
+    <div><div class="arch-stat-val" id="s-draft" style="color:var(--text2)">—</div><div class="arch-stat-lbl">مسودة</div></div>
+  </div>
+</div>
+
+<div class="arch-filters">
+  <input id="arch-search" placeholder="ابحث بالعنوان أو رقم الأرشيف..." oninput="applyFilter()">
+  <select id="arch-year" onchange="applyFilter()"><option value="">كل السنوات</option></select>
+  <select id="arch-section" onchange="applyFilter()"><option value="">كل الأقسام</option></select>
+  <select id="arch-status" onchange="syncStatusFilter()">
+    <option value="">كل الحالات</option>
+    <option value="approved">معتمد</option>
+    <option value="pending">معلق</option>
+    <option value="draft">مسودة</option>
+    <option value="rejected">غير معتمد</option>
+  </select>
+  <button class="btn-ghost" onclick="loadArchive()" style="flex-shrink:0"><i class="fa-solid fa-rotate"></i></button>
+</div>
+
+<div class="storage-shell">
+  <div class="storage-head">
+    <div>
+      <div style="font-size:14px;font-weight:700"><i class="fa-solid fa-folder-tree"></i> ملفات أقسام الأرشيف</div>
+    </div>
+    <div class="storage-actions">
+      <button class="arch-btn" id="storage-sections-btn" onclick="backToSections()"><i class="fa-solid fa-grid-2"></i> الأقسام</button>
+      <button class="arch-btn" id="storage-up-btn" onclick="goStorageUp()"><i class="fa-solid fa-arrow-up"></i> رجوع</button>
+      <button class="arch-btn" id="storage-print-btn" onclick="printStorageSectionDocs()" style="display:none"><i class="fa-solid fa-print"></i> طباعة</button>
+      <button class="arch-btn" onclick="refreshStorage()"><i class="fa-solid fa-rotate"></i> تحديث</button>
+    </div>
+  </div>
+  <div class="storage-path" id="storage-path">—</div>
+  <div class="storage-meta-bar" id="storage-meta-bar"></div>
+  <div class="storage-browser" id="storage-browser">
+    <div class="storage-empty"><i class="fa-solid fa-hourglass-half"></i><div style="margin-top:8px">جارٍ تحميل أقسام الأرشيف...</div></div>
+  </div>
+</div>
+
+<div id="arch-count" style="font-size:12px;color:var(--text3);margin:10px 2px"></div>
+
+<!-- Section breadcrumb bar (shown when drilled into a section) -->
+<div id="sec-doc-bar" class="sec-doc-bar" style="display:none">
+  <button class="btn-ghost" onclick="exitSectionView()" style="flex-shrink:0"><i class="fa-solid fa-arrow-right"></i> الأقسام</button>
+  <div class="sec-doc-bar-title" id="sec-doc-bar-title"></div>
+  <button class="btn-ghost" onclick="printSectionDocs()" style="flex-shrink:0"><i class="fa-solid fa-print"></i> طباعة</button>
+</div>
+
+<!-- Section cards (shown when NOT drilled into a section) -->
+<div id="sec-cards-area" class="sec-cards-grid"></div>
+
+<div id="arch-list"></div>
+
+<!-- Hidden print table -->
+<div id="print-table-wrap" style="display:none"></div>
+
+<!-- QR Popup -->
+<div class="qr-popup" id="qr-popup" onclick="if(event.target.id==='qr-popup')this.classList.remove('open')">
+  <div class="qr-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px"><i class="fa-solid fa-mobile-screen-button"></i> التحقق من الوثيقة</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:14px" id="qr-doc-title">—</div>
+    <div class="qr-img-wrap"><img id="qr-img-el" src="" alt="QR"></div>
+    <div style="font-size:11px;color:var(--accent);font-family:monospace;letter-spacing:1px;margin-bottom:14px" id="qr-serial-val">—</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <a id="qr-verify-link" href="#" target="_blank" class="btn-primary btn-sm"><i class="fa-solid fa-up-right-from-square"></i> صفحة التحقق</a>
+      <button class="arch-btn" onclick="document.getElementById('qr-popup').classList.remove('open')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Drawer -->
+<div class="detail-drawer" id="detail-drawer">
+  <div class="detail-backdrop" onclick="closeDrawer()"></div>
+  <div class="detail-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:16px;font-weight:700">تفاصيل الوثيقة</div>
+      <button class="btn-ghost" onclick="closeDrawer()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let archDocs    = [];
+let storageDocs = [];
+let storageDocsLoaded = false;
+let storageDocsLoading = false;
+let activeStatus = '';
+let archiveScope = null;
+let docSectionView = { active: false, code: '', name: '' };
+let storageState = {
+  currentPath:'',
+  rootPath:'',
+  canGoUp:false,
+  sections:[],
+  selectedSectionCode:'',
+  selectedSectionName:'',
+};
+
+const SC = {
+  approved:{label:'معتمد',  badge:'badge-approved'},
+  pending: {label:'معلق',   badge:'badge-pending'},
+  draft:   {label:'مسودة',  badge:'badge-draft'},
+  rejected:{label:'غير معتمد',  badge:'badge-rejected'},
+};
+const STATUS_LABEL = {
+  approved:'معتمد',
+  pending:'معلق',
+  draft:'مسودة',
+  rejected:'غير معتمد',
+  archived:'مؤرشف'
+};
+const FILE_ICONS = {
+  pdf:'<i class="fa-solid fa-file-pdf"></i>',
+  doc:'<i class="fa-solid fa-file-word"></i>',
+  docx:'<i class="fa-solid fa-file-word"></i>',
+  png:'<i class="fa-solid fa-image"></i>',
+  jpg:'<i class="fa-solid fa-image"></i>',
+  jpeg:'<i class="fa-solid fa-image"></i>'
+};
+const BG = {
+  approved:'rgba(16,185,129,.12)',
+  pending:'rgba(245,158,11,.12)',
+  rejected:'rgba(239,68,68,.12)',
+  draft:'rgba(148,163,184,.1)'
+};
+
+async function loadArchive(){
+  try{
+    const res  = await fetch(`/api/archive?_=${Date.now()}`, {headers:{'Accept':'application/json'}, cache:'no-store'});
+    const data = await res.json();
+    archDocs   = data.docs || [];
+    archiveScope = data.scope || null;
+
+    syncArchiveScopeUi();
+
+    document.getElementById('s-total').textContent    = data.stats?.total    ?? archDocs.length;
+    document.getElementById('s-approved').textContent = data.stats?.approved ?? 0;
+    document.getElementById('s-pending').textContent  = data.stats?.pending  ?? 0;
+    document.getElementById('s-draft').textContent    = data.stats?.draft    ?? 0;
+
+    const years = [...new Set(archDocs.map(d=>(d.created_at||'').slice(0,4)).filter(Boolean))].sort().reverse();
+    const sel   = document.getElementById('arch-year');
+    sel.innerHTML = '<option value="">كل السنوات</option>';
+    years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y;sel.appendChild(o);});
+
+    const sectionSel = document.getElementById('arch-section');
+    const sections = [...new Set(archDocs.map(d => {
+      const name = (d.archive_section || 'عام').trim();
+      const code = (d.archive_section_code || 'GN').trim();
+      return `${name} (${code})`;
+    }))].sort();
+    sectionSel.innerHTML = '<option value="">كل الأقسام</option>';
+    sections.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sectionSel.appendChild(o);});
+
+    sectionSel.disabled = !!archiveScope?.is_scoped;
+    sectionSel.title = archiveScope?.is_scoped ? 'يتم تقييد العرض تلقائياً حسب قسمك' : '';
+
+    applyFilter();
+    loadStorageDocsIndex();
+  loadStorageSections();
+}catch(e){
+    document.getElementById('arch-list').innerHTML='<div class="empty"><div class="empty-icon"><i class="fa-solid fa-circle-xmark"></i></div><div class="empty-text">فشل تحميل البيانات</div></div>';
+    document.getElementById('storage-browser').innerHTML='<div class="storage-empty"><i class="fa-solid fa-circle-xmark"></i><div style="margin-top:8px">فشل تحميل ملفات القسم</div></div>';
+  }
+}
+
+function mapStorageFileToDoc(file, section){
+  const when = formatStorageDate(file.ts, file.date || '');
+  return {
+    id: null,
+    is_storage: true,
+    title: file.title || file.name || 'ملف أرشيف',
+    archive_number: file.archive_number || `ST-${(file.name || 'FILE').replace(/\s+/g, '-').toUpperCase()}`,
+    archive_section: section?.section_name || storageState.selectedSectionName || 'عام',
+    archive_section_code: (section?.section_code || storageState.selectedSectionCode || 'GN').toUpperCase(),
+    creator_name: file.creator_name || '',
+    created_at: when,
+    status: (file.status || 'archived').toLowerCase(),
+    download_url: file.download_url || '',
+    file_path: file.name || '',
+    serial: '',
+    signer_names: ''
+  };
+}
+
+async function loadStorageDocsIndex(){
+  if(storageDocsLoaded || storageDocsLoading) return;
+  storageDocsLoading = true;
+  try{
+    const secRes = await fetch(`/api/archive/storage?_=${Date.now()}`, {headers:{'Accept':'application/json'}, cache:'no-store'});
+    const secData = await secRes.json();
+    const sections = Array.isArray(secData.sections) ? secData.sections : [];
+    const reqs = sections.map(async section => {
+      const sectionCode = encodeURIComponent(section.section_code || 'GN');
+      const res = await fetch(`/api/archive/storage?section_code=${sectionCode}&path=&_=${Date.now()}`, {headers:{'Accept':'application/json'}, cache:'no-store'});
+      const data = await res.json();
+      if(!res.ok || data.success === false) return [];
+      const files = Array.isArray(data.listing?.files) ? data.listing.files : [];
+      return files.map(file => mapStorageFileToDoc(file, data.section || section));
+    });
+    const all = await Promise.all(reqs);
+    storageDocs = all.flat();
+    storageDocsLoaded = true;
+    applyFilter();
+  }catch(e){
+    storageDocs = [];
+  }finally{
+    storageDocsLoading = false;
+  }
+}
+
+function syncArchiveScopeUi(){
+  const chip = document.getElementById('arch-scope-chip');
+  const text = document.getElementById('arch-scope-text');
+  if(!chip || !text) return;
+  const label = archiveScope ? `${archiveScope.section_name || 'عام'} (${archiveScope.section_code || 'GN'})` : '—';
+  chip.innerHTML = `<i class="fa-solid fa-folder-tree"></i> ${label}`;
+  text.textContent = archiveScope?.is_scoped
+    ? `يتم عرض الوثائق والملفات الخاصة بقسمك فقط: ${label}`
+    : 'يتم عرض جميع الأقسام';
+}
+
+function normalizeStoragePath(path=''){
+  const raw = String(path || '').replace(/\\/g,'/').trim().replace(/^\/+|\/+$/g,'');
+  if(!raw) return '';
+  const safe = [];
+  raw.split('/').forEach(part=>{
+    const p = part.trim();
+    if(!p || p==='.') return;
+    if(p==='..'){ if(safe.length) safe.pop(); return; }
+    safe.push(p);
+  });
+  return safe.join('/');
+}
+
+function formatStorageDate(ts, fallback=''){
+  const value = Number(ts || 0);
+  if(value > 0){
+    try{ return new Date(value * 1000).toLocaleString('ar-SA'); }catch(e){}
+  }
+  return fallback || '—';
+}
+
+function escapeHtml(value=''){
+  return String(value ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function docMergeKey(d={}){
+  const sec = String(d.archive_section_code || '').trim().toUpperCase() || 'GN';
+  const num = String(d.archive_number || '').trim().toUpperCase();
+  if(num) return `num:${sec}:${num}`;
+  const title = String(d.title || '').trim().toUpperCase();
+  const created = String(d.created_at || '').trim().slice(0,10);
+  return `meta:${sec}:${title}:${created}`;
+}
+
+function mergeDocsUnified(primaryDocs=[], secondaryDocs=[]){
+  const out = [];
+  const seen = new Set();
+  [...primaryDocs, ...secondaryDocs].forEach(d => {
+    const key = docMergeKey(d || {});
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push(d);
+  });
+  return out;
+}
+
+function toggleLowerArchiveArea(hidden){
+  const archCount = document.getElementById('arch-count');
+  const secDocBar = document.getElementById('sec-doc-bar');
+  const secCards = document.getElementById('sec-cards-area');
+  const archList = document.getElementById('arch-list');
+
+  if(hidden){
+    if(archCount) archCount.style.display = 'none';
+    if(secDocBar) secDocBar.style.display = 'none';
+    if(secCards) secCards.style.display = 'none';
+    if(archList) archList.style.display = 'none';
+    return;
+  }
+
+  if(archCount) archCount.style.display = '';
+  if(secCards) secCards.style.display = '';
+  if(archList) archList.style.display = '';
+  applyFilter();
+}
+
+function renderStorageMeta(listing={}){
+  const folders = Array.isArray(listing.folders) ? listing.folders.length : 0;
+  const files = Array.isArray(listing.files) ? listing.files.length : 0;
+  const sectionLabel = storageState.selectedSectionCode
+    ? `${storageState.selectedSectionName || storageState.selectedSectionCode} (${storageState.selectedSectionCode})`
+    : '—';
+  document.getElementById('storage-meta-bar').innerHTML = `
+    <span class="storage-chip"><i class="fa-solid fa-folder"></i> المجلدات: ${folders}</span>
+    <span class="storage-chip"><i class="fa-solid fa-file"></i> الملفات: ${files}</span>
+    <span class="storage-chip"><i class="fa-solid fa-layer-group"></i> القسم: ${sectionLabel}</span>
+  `;
+}
+
+function renderStorageSections(sections=[]){
+  const container = document.getElementById('storage-browser');
+  if(!sections.length){
+    container.innerHTML = '<div class="storage-empty"><i class="fa-solid fa-folder-open"></i><div style="margin-top:8px">لا توجد أقسام متاحة</div></div>';
+    return;
+  }
+
+  container.innerHTML = sections.map(section=>{
+    const name = escapeHtml(section.section_name || 'عام');
+    const code = escapeHtml(section.section_code || 'GN');
+    const selected = (storageState.selectedSectionCode || '').toUpperCase() === (section.section_code || '').toUpperCase();
+    return `
+      <div class="storage-item folder" style="${selected ? 'border-color:var(--accent);background:var(--accent-dim)' : ''}" data-code="${encodeURIComponent(section.section_code || '')}" data-name="${encodeURIComponent(section.section_name || '')}" onclick="openStorageSectionFromEvent(this)">
+        <div class="storage-item-icon"><i class="fa-solid fa-folder-tree"></i></div>
+        <div class="storage-item-body">
+          <div class="storage-item-name">${name}</div>
+          <div class="storage-item-sub"><span><i class="fa-solid fa-key"></i> ${code}</span></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadStorageSections(){
+  const browser = document.getElementById('storage-browser');
+  browser.innerHTML = '<div class="storage-empty"><i class="fa-solid fa-hourglass-half"></i><div style="margin-top:8px">جارٍ تحميل مجلدات الأقسام...</div></div>';
+
+  try{
+    const res = await fetch(`/api/archive/storage?_=${Date.now()}`, {headers:{'Accept':'application/json'}, cache:'no-store'});
+    const data = await res.json();
+    if(!res.ok || data.success === false) throw new Error(data.error || 'sections_failed');
+
+    archiveScope = data.scope || archiveScope;
+    syncArchiveScopeUi();
+
+    storageState.sections = Array.isArray(data.sections) ? data.sections : [];
+    storageState.selectedSectionCode = '';
+    storageState.selectedSectionName = '';
+    storageState.currentPath = '';
+    storageState.rootPath = '';
+    storageState.canGoUp = false;
+
+    document.getElementById('storage-path').textContent = 'اختر قسماً من المجلدات أعلاه';
+    document.getElementById('storage-up-btn').disabled = true;
+    document.getElementById('storage-sections-btn').disabled = true;
+    document.getElementById('storage-print-btn').style.display = 'none';
+    document.getElementById('storage-meta-bar').innerHTML = `<span class="storage-chip"><i class="fa-solid fa-folder-tree"></i> الأقسام: ${storageState.sections.length}</span>`;
+    renderStorageSections(storageState.sections);
+    toggleLowerArchiveArea(false);
+  }catch(e){
+    document.getElementById('storage-path').textContent = 'تعذر تحميل الأقسام';
+    document.getElementById('storage-up-btn').disabled = true;
+    document.getElementById('storage-sections-btn').disabled = true;
+    document.getElementById('storage-meta-bar').innerHTML = '';
+    browser.innerHTML = '<div class="storage-empty"><i class="fa-solid fa-circle-xmark"></i><div style="margin-top:8px">فشل تحميل أقسام الأرشيف</div></div>';
+    toggleLowerArchiveArea(false);
+  }
+}
+
+function renderStorageList(listing={}){
+  const container = document.getElementById('storage-browser');
+  const folders = Array.isArray(listing.folders) ? listing.folders : [];
+  const files = Array.isArray(listing.files) ? listing.files : [];
+
+  if(!folders.length && !files.length){
+    container.innerHTML = '<div class="storage-empty"><i class="fa-solid fa-folder-open"></i><div style="margin-top:8px">لا يوجد ملفات داخل هذا القسم</div></div>';
+    return;
+  }
+
+  const foldersHtml = folders.map(folder=>{
+    const folderName = escapeHtml(folder.name || '—');
+    const folderPath = encodeURIComponent(folder.path || folder.name || '');
+    const folderDate = formatStorageDate(folder.ts, folder.date);
+    return `
+      <div class="storage-item folder" data-path="${folderPath}" onclick="openStorageFolderFromEvent(this)">
+        <div class="storage-item-icon"><i class="fa-solid fa-folder"></i></div>
+        <div class="storage-item-body">
+          <div class="storage-item-name">${folderName}</div>
+          <div class="storage-item-sub"><span><i class="fa-regular fa-clock"></i> ${escapeHtml(folderDate)}</span></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const dbSectionDocs = archDocs.filter(d =>
+    (d.archive_section_code || '').toUpperCase() === (storageState.selectedSectionCode || '').toUpperCase()
+  );
+
+  const unifiedSectionDocs = mergeDocsUnified(dbSectionDocs, files.map(file => mapStorageFileToDoc(file, {
+    section_code: storageState.selectedSectionCode,
+    section_name: storageState.selectedSectionName
+  })));
+
+  const unifiedDocsHtml = unifiedSectionDocs.map(d=>{
+    const sc = SC[d.status] || SC.draft;
+    const ext = (d.file_path||'').split('.').pop().toLowerCase();
+    const ico = d.file_path ? (FILE_ICONS[ext]||'<i class="fa-solid fa-paperclip"></i>') : '<i class="fa-solid fa-clipboard-list"></i>';
+    return `
+      <div class="arch-card storage-doc-card" ${d.is_storage ? '' : `onclick="openDrawer(${d.id})"`}>
+        <div class="arch-icon" style="background:${BG[d.status]||BG.draft}">${ico}</div>
+        <div class="arch-body">
+          <div class="arch-title">${escapeHtml(d.title || '—')}</div>
+          <div class="arch-num">${escapeHtml(d.archive_number || '—')}</div>
+          <div class="arch-meta">
+            <div class="arch-meta-item"><i class="fa-solid fa-user"></i> ${escapeHtml(d.creator_name || '—')}</div>
+            <div class="arch-meta-item"><i class="fa-regular fa-calendar"></i> ${escapeHtml((d.created_at||'').toString().slice(0,10) || '—')}</div>
+          </div>
+        </div>
+        <div class="arch-right">
+          <span class="badge ${sc.badge}">${escapeHtml(sc.label)}</span>
+          <div class="arch-actions" onclick="event.stopPropagation()">
+            ${d.is_storage && d.download_url ? `<a href="${d.download_url}" class="arch-btn"><i class="fa-solid fa-download"></i> تحميل</a>` : ''}
+            ${!d.is_storage && canDownloadDoc(d)?`<a href="/api/documents/${d.id}/download-signed" class="arch-btn"><i class="fa-solid fa-download"></i> تحميل</a>`:''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = [
+    foldersHtml,
+    unifiedSectionDocs.length ? `<div class="storage-files-wrap">${unifiedDocsHtml}</div>` : ''
+  ].join('');
+}
+
+async function loadStorage(path=''){
+  if(!storageState.selectedSectionCode){
+    return loadStorageSections();
+  }
+
+  toggleLowerArchiveArea(true);
+
+  const nextPath = normalizeStoragePath(path);
+  const browser = document.getElementById('storage-browser');
+  browser.innerHTML = '<div class="storage-empty"><i class="fa-solid fa-hourglass-half"></i><div style="margin-top:8px">جارٍ تحميل ملفات القسم...</div></div>';
+
+  try{
+    const sectionCode = encodeURIComponent(storageState.selectedSectionCode);
+    const res = await fetch(`/api/archive/storage?section_code=${sectionCode}&path=${encodeURIComponent(nextPath)}&_=${Date.now()}`, {headers:{'Accept':'application/json'}, cache:'no-store'});
+    const data = await res.json();
+    if(!res.ok || data.success === false) throw new Error(data.error || 'storage_failed');
+
+    archiveScope = data.scope || archiveScope;
+    syncArchiveScopeUi();
+
+    storageState.sections = Array.isArray(data.sections) ? data.sections : storageState.sections;
+    storageState.selectedSectionCode = (data.section?.section_code || storageState.selectedSectionCode || '').toUpperCase();
+    storageState.selectedSectionName = data.section?.section_name || storageState.selectedSectionName;
+    storageState.currentPath = data.relative_path || '';
+    storageState.rootPath = data.root_path || '';
+    storageState.canGoUp = !!data.can_go_up;
+
+    document.getElementById('storage-path').textContent = data.resolved_path || data.root_path || '—';
+    document.getElementById('storage-up-btn').disabled = true;
+    document.getElementById('storage-sections-btn').disabled = false;
+    document.getElementById('storage-print-btn').style.display = '';
+    renderStorageMeta(data.listing || {});
+    renderStorageList(data.listing || {});
+  }catch(e){
+    document.getElementById('storage-path').textContent = 'تعذر تحميل المسار';
+    document.getElementById('storage-up-btn').disabled = true;
+    document.getElementById('storage-sections-btn').disabled = false;
+    document.getElementById('storage-meta-bar').innerHTML = `<span class="storage-chip"><i class="fa-solid fa-layer-group"></i> القسم: ${storageState.selectedSectionName || storageState.selectedSectionCode || '—'}</span>`;
+    browser.innerHTML = '<div class="storage-empty"><i class="fa-solid fa-circle-xmark"></i><div style="margin-top:8px">فشل تحميل مجلد القسم</div></div>';
+    toggleLowerArchiveArea(true);
+  }
+}
+
+function openStorageSection(sectionCode='', sectionName=''){
+  const normalizedCode = String(sectionCode || '').trim().toUpperCase();
+  if(!normalizedCode) return;
+  storageState.selectedSectionCode = normalizedCode;
+  storageState.selectedSectionName = String(sectionName || '').trim() || normalizedCode;
+  storageState.currentPath = '';
+  loadStorage('');
+}
+
+function openStorageSectionFromEvent(el){
+  const encodedCode = el?.getAttribute('data-code') || '';
+  const encodedName = el?.getAttribute('data-name') || '';
+  openStorageSection(decodeURIComponent(encodedCode), decodeURIComponent(encodedName));
+}
+
+function openStorageFolder(folderName=''){
+  const safeName = normalizeStoragePath(folderName);
+  if(!safeName) return;
+  const next = storageState.currentPath ? `${storageState.currentPath}/${safeName}` : safeName;
+  loadStorage(next);
+}
+
+function openStorageFolderFromEvent(el){
+  const encoded = el?.getAttribute('data-path') || '';
+  openStorageFolder(decodeURIComponent(encoded));
+}
+
+function goStorageUp(){
+  return;
+}
+
+function backToSections(){
+  loadStorageSections();
+}
+
+function printStorageSectionDocs(){
+  const code = storageState.selectedSectionCode;
+  const name = storageState.selectedSectionName || code;
+  if(!code) return;
+  const list = archDocs.filter(d =>
+    (d.archive_section_code||'').toUpperCase() === code.toUpperCase()
+  );
+  const stLabel = {approved:'معتمد',pending:'معلق',draft:'مسودة',rejected:'غير معتمد'};
+  const stClass = {approved:'pt-approved',pending:'pt-pending',draft:'pt-draft',rejected:'pt-rejected'};
+  const rows = list.map((d,i) => {
+    const dtRaw  = (d.created_at||'').replace('T',' ').slice(0,19);
+    const date   = dtRaw.slice(0,10);
+    const time   = dtRaw.slice(11,16);
+    const appDt  = d.approved_at ? (d.approved_at||'').replace('T',' ').slice(0,16) : '—';
+    const st     = d.status || 'draft';
+    const signers = escapeHtml(d.signer_names || '—');
+    const serial  = escapeHtml(d.serial || '—');
+    const notes   = escapeHtml(d.notes || '—');
+    const creator = escapeHtml(d.creator_name || '—');
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td style="font-family:monospace;direction:ltr;white-space:nowrap">${escapeHtml(d.archive_number||'—')}</td>
+      <td>${escapeHtml(d.title||'—')}</td>
+      <td style="white-space:nowrap">${escapeHtml(date)}</td>
+      <td style="text-align:center">${escapeHtml(time)}</td>
+      <td class="${stClass[st]||''}" style="text-align:center">${stLabel[st]||st}</td>
+      <td>${creator}</td>
+      <td style="white-space:nowrap">${escapeHtml(appDt)}</td>
+      <td>${signers}</td>
+      <td style="font-family:monospace;font-size:10px;direction:ltr">${serial}</td>
+      <td style="font-size:11px;color:#555">${notes}</td>
+    </tr>`;
+  }).join('');
+  const printWrap = document.getElementById('print-table-wrap');
+  printWrap.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0 0 4px;font-family:Arial">جردة قسم الأرشيف: ${escapeHtml(name)} (${escapeHtml(code)})</h2>
+        <p style="margin:0;font-size:11px;color:#666;font-family:Arial">تاريخ الطباعة: ${new Date().toLocaleString('ar-SA')} — إجمالي: ${list.length} وثيقة</p>
+      </div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>رقم الأرشيف</th>
+        <th>العنوان</th>
+        <th>تاريخ الإنشاء</th>
+        <th>الوقت</th>
+        <th>الحالة</th>
+        <th>منشئ الوثيقة</th>
+        <th>تاريخ الاعتماد</th>
+        <th>الموقّعون</th>
+        <th>السيريل نمبر</th>
+        <th>ملاحظات</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="11" style="text-align:center;color:#999">لا توجد وثائق لهذا القسم</td></tr>'}</tbody>
+    </table>
+  `;
+  printWrap.style.display = 'block';
+  window.print();
+  setTimeout(()=>{ printWrap.innerHTML=''; printWrap.style.display='none'; },800);
+}
+
+function refreshStorage(){
+  if(storageState.selectedSectionCode){
+    loadStorage(storageState.currentPath || '');
+    return;
+  }
+  loadStorageSections();
+}
+
+function filterByStatus(status){
+  activeStatus = status;
+  document.getElementById('arch-status').value = status;
+  document.querySelectorAll('.arch-stat').forEach(s=>s.classList.remove('active-filter'));
+  const map={'':'stat-all',approved:'stat-approved',pending:'stat-pending',draft:'stat-draft'};
+  if(map[status]) document.getElementById(map[status]).classList.add('active-filter');
+  applyFilter();
+}
+
+function syncStatusFilter(){
+  filterByStatus(document.getElementById('arch-status').value);
+}
+
+function applyFilter(){
+  const q      = document.getElementById('arch-search').value.toLowerCase();
+  const year   = document.getElementById('arch-year').value;
+  const section = document.getElementById('arch-section').value;
+  const status = activeStatus;
+
+  const allDocs = mergeDocsUnified(archDocs, storageDocs);
+
+  let list = allDocs.filter(d=>
+    (!q      || d.title.toLowerCase().includes(q) || (d.archive_number||'').toLowerCase().includes(q) || (d.archive_section||'').toLowerCase().includes(q) || (d.archive_section_code||'').toLowerCase().includes(q)) &&
+    (!year   || String(d.created_at||'').startsWith(year)) &&
+    (!section || `${(d.archive_section || 'عام').trim()} (${(d.archive_section_code || 'GN').trim()})` === section) &&
+    (!status || d.status===status)
+  );
+
+  // Extra filter when drilled into a section
+  if(docSectionView.active && docSectionView.code){
+    list = list.filter(d => (d.archive_section_code||'').toUpperCase() === docSectionView.code.toUpperCase());
+  }
+
+  document.getElementById('arch-count').textContent = `${list.length} وثيقة`;
+
+  if(!docSectionView.active && !q && !status && !year && !section){
+    renderSectionCards(allDocs);
+    document.getElementById('arch-list').innerHTML = '';
+    document.getElementById('sec-doc-bar').style.display = 'none';
+  } else if(!docSectionView.active){
+    renderSectionCards(allDocs);
+    document.getElementById('sec-doc-bar').style.display = 'none';
+    renderArchive(list);
+  } else {
+    document.getElementById('sec-cards-area').innerHTML = '';
+    document.getElementById('sec-doc-bar').style.display = 'flex';
+    document.getElementById('sec-doc-bar-title').textContent =
+      `${docSectionView.name || docSectionView.code} — ${list.length} وثيقة`;
+    renderArchive(list);
+  }
+}
+
+function canDownloadDoc(doc){
+  return !!(doc && (doc.can_download || doc.file_path || doc.archive_storage_path || doc.content_json));
+}
+
+// ─── Section cards ───────────────────────────────
+function renderSectionCards(docs){
+  const sectionMap = {};
+  docs.forEach(d => {
+    const code = (d.archive_section_code || 'GN').trim().toUpperCase();
+    const name = (d.archive_section || 'عام').trim();
+    if(!sectionMap[code]) sectionMap[code] = { name, code, count: 0 };
+    sectionMap[code].count++;
+  });
+  const sections = Object.values(sectionMap).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  const el = document.getElementById('sec-cards-area');
+  if(!sections.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-box-archive"></i></div><div class="empty-text">لا توجد أقسام</div></div>';
+    return;
+  }
+  el.innerHTML = sections.map(s => `
+    <div class="sec-card" onclick="enterSectionView('${escapeHtml(s.code)}','${escapeHtml(s.name)}')">
+      <div class="sec-card-icon"><i class="fa-solid fa-folder-tree"></i></div>
+      <div class="sec-card-body">
+        <div class="sec-card-name">${escapeHtml(s.name)}</div>
+        <div class="sec-card-meta">
+          <span class="sec-card-code">${escapeHtml(s.code)}</span>
+          <span class="sec-card-count">${s.count} وثيقة</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function enterSectionView(code, name){
+  docSectionView = { active: true, code, name };
+  applyFilter();
+}
+
+function exitSectionView(){
+  docSectionView = { active: false, code: '', name: '' };
+  applyFilter();
+}
+
+function printSectionDocs(){
+  const code = docSectionView.code;
+  const name = docSectionView.name;
+  // طباعة كل وثائق القسم بدون أي فلتر
+  const list = archDocs.filter(d =>
+    (d.archive_section_code||'').toUpperCase() === code.toUpperCase()
+  );
+  const stLabel = {approved:'معتمد',pending:'معلق',draft:'مسودة',rejected:'غير معتمد'};
+  const stClass = {approved:'pt-approved',pending:'pt-pending',draft:'pt-draft',rejected:'pt-rejected'};
+  const rows = list.map((d,i) => {
+    const dtRaw  = (d.created_at||'').replace('T',' ').slice(0,19);
+    const date   = dtRaw.slice(0,10);
+    const time   = dtRaw.slice(11,16);
+    const appDt  = d.approved_at ? (d.approved_at||'').replace('T',' ').slice(0,16) : '—';
+    const st     = d.status || 'draft';
+    const signers = escapeHtml(d.signer_names || '—');
+    const serial  = escapeHtml(d.serial || '—');
+    const notes   = escapeHtml(d.notes || '—');
+    const creator = escapeHtml(d.creator_name || '—');
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td style="font-family:monospace;direction:ltr;white-space:nowrap">${escapeHtml(d.archive_number||'—')}</td>
+      <td>${escapeHtml(d.title||'—')}</td>
+      <td style="white-space:nowrap">${escapeHtml(date)}</td>
+      <td style="text-align:center">${escapeHtml(time)}</td>
+      <td class="${stClass[st]||''}" style="text-align:center">${stLabel[st]||st}</td>
+      <td>${creator}</td>
+      <td style="white-space:nowrap">${escapeHtml(appDt)}</td>
+      <td>${signers}</td>
+      <td style="font-family:monospace;font-size:10px;direction:ltr">${serial}</td>
+      <td style="font-size:11px;color:#555">${notes}</td>
+    </tr>`;
+  }).join('');
+
+  const stFilter = '';
+  const printWrap = document.getElementById('print-table-wrap');
+  printWrap.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0 0 4px;font-family:Arial">قسم الأرشيف: ${escapeHtml(name)} (${escapeHtml(code)})</h2>
+        <p style="margin:0;font-size:11px;color:#666;font-family:Arial">تاريخ الطباعة: ${new Date().toLocaleString('ar-SA')} — إجمالي: ${list.length} وثيقة</p>
+      </div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>رقم الأرشيف</th>
+        <th>العنوان</th>
+        <th>تاريخ الإنشاء</th>
+        <th>الوقت</th>
+        <th>الحالة</th>
+        <th>منشئ الوثيقة</th>
+        <th>تاريخ الاعتماد</th>
+        <th>الموقّعون</th>
+        <th>السيريل نمبر</th>
+        <th>ملاحظات</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  printWrap.style.display = 'block';
+  window.print();
+  setTimeout(()=>{ printWrap.innerHTML=''; printWrap.style.display='none'; },800);
+}
+
+function renderArchive(docs){
+  const el = document.getElementById('arch-list');
+  if(!docs.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon"><i class="fa-solid fa-box-archive"></i></div><div class="empty-text">لا توجد وثائق</div></div>';
+    return;
+  }
+  el.innerHTML = docs.map(d=>{
+    const sc  = SC[d.status] || {label:(STATUS_LABEL[d.status] || 'مؤرشف'), badge:'badge-draft'};
+    const ext = (d.file_path||'').split('.').pop().toLowerCase();
+    const ico = d.file_path ? (FILE_ICONS[ext]||'<i class="fa-solid fa-paperclip"></i>') : '<i class="fa-solid fa-clipboard-list"></i>';
+    const t   = (d.title||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const canSignByRequest = d.status!=='approved' && d.needs_sign && d.pending_sign_request_id;
+    const canSignDirect = d.status!=='approved' && d.can_sign_direct && !d.needs_sign;
+    const signUrl = canSignByRequest ? `/sign/${d.pending_sign_request_id}` : (canSignDirect ? `/sign/doc/${d.id}` : '');
+    return `<div class="arch-card" ${d.is_storage ? '' : `onclick="openDrawer(${d.id})"`}>
+      <div class="arch-icon" style="background:${BG[d.status]||BG.draft}">${ico}</div>
+      <div class="arch-body">
+        <div class="arch-title">${d.title}</div>
+        <div class="arch-num">${d.archive_number||'—'}</div>
+        <div class="arch-meta">
+          <div class="arch-meta-item"><i class="fa-solid fa-layer-group"></i> ${d.archive_section||'عام'} (${d.archive_section_code||'GN'})</div>
+          <div class="arch-meta-item"><i class="fa-regular fa-calendar"></i> ${(d.created_at||'').slice(0,10)}</div>
+          ${d.creator_name?`<div class="arch-meta-item"><i class="fa-solid fa-user"></i> ${d.creator_name}</div>`:''}
+          ${d.signer_names?`<div class="arch-meta-item"><i class="fa-solid fa-signature"></i> ${d.signer_names}</div>`:''}
+          ${d.serial?`<div class="arch-meta-item" style="color:var(--accent);direction:ltr;font-family:monospace"><i class="fa-solid fa-key"></i> ${d.serial}</div>`:''}
+        </div>
+      </div>
+      <div class="arch-right">
+        <span class="badge ${sc.badge}">${sc.label}</span>
+        <div class="arch-actions" onclick="event.stopPropagation()">
+          ${d.serial?`<button class="arch-btn" onclick="openQR('${d.serial}','${t}')"><i class="fa-solid fa-qrcode"></i> QR</button>`:''}
+          ${d.is_storage && d.download_url ? `<a href="${d.download_url}" class="arch-btn"><i class="fa-solid fa-download"></i></a>` : ''}
+          ${!d.is_storage && canDownloadDoc(d)?`<a href="/api/documents/${d.id}/download-signed" class="arch-btn"><i class="fa-solid fa-download"></i></a>`:''}
+          ${signUrl?`<a href="${signUrl}" class="arch-btn"><i class="fa-solid fa-signature"></i></a>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openQR(serial, title){
+  document.getElementById('qr-doc-title').textContent  = title;
+  document.getElementById('qr-serial-val').textContent = serial;
+  document.getElementById('qr-img-el').src              = `/api/qr/${serial}?t=${Date.now()}`;
+  document.getElementById('qr-verify-link').href        = `/verify/${serial}`;
+  document.getElementById('qr-popup').classList.add('open');
+}
+
+async function openDrawer(docId){
+  document.getElementById('detail-drawer').classList.add('open');
+  document.getElementById('detail-content').innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><i class="fa-solid fa-hourglass-half"></i></div>';
+  const [d, sigs] = await Promise.all([
+    fetch(`/api/documents/${docId}`).then(r=>r.json()),
+    fetch(`/api/documents/${docId}/signatures`).then(r=>r.json()).catch(()=>[]),
+  ]);
+  const sc  = SC[d.status]||SC.draft;
+  const arr = Array.isArray(sigs)?sigs:[];
+  const t   = (d.title||'').replace(/'/g,"\\'");
+  const firstSerial = arr.find(s=>s.serial_number)?.serial_number;
+  const canSignByRequest = !!(d.status!=='approved' && d.needs_sign && d.pending_sign_request_id);
+  const canSignDirect = !!(d.status!=='approved' && d.can_sign_direct && !d.needs_sign);
+  const signUrl = canSignByRequest ? `/sign/${d.pending_sign_request_id}` : (canSignDirect ? `/sign/doc/${docId}` : '');
+  document.getElementById('detail-content').innerHTML=`
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px">${d.title}</div>
+      <span class="badge ${sc.badge}">${sc.label}</span>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:14px">
+      <div class="detail-row"><div class="detail-lbl">رقم الأرشيف</div><div class="detail-val" style="font-family:monospace;color:var(--accent)">${d.archive_number||'—'}</div></div>
+      <div class="detail-row"><div class="detail-lbl">القسم</div><div class="detail-val">${d.archive_section||'عام'} (${d.archive_section_code||'GN'})</div></div>
+      <div class="detail-row"><div class="detail-lbl">تاريخ الإنشاء</div><div class="detail-val">${(d.created_at||'').slice(0,16).replace('T',' ')}</div></div>
+      ${d.approved_at?`<div class="detail-row"><div class="detail-lbl">تاريخ الاعتماد</div><div class="detail-val">${(d.approved_at||'').slice(0,16).replace('T',' ')}</div></div>`:''}
+      ${d.notes?`<div class="detail-row"><div class="detail-lbl">ملاحظات</div><div class="detail-val">${d.notes}</div></div>`:''}
+    </div>
+    ${arr.length?`
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">سجل التوقيعات</div>
+      ${arr.map(s=>`<div class="tl-item">
+        <div class="tl-dot" style="background:${s.status==='signed'?'var(--green)':'var(--text3)'}"></div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:600">${s.signer_name||'—'} <span style="font-size:10px;color:var(--text3);font-weight:400">— ${s.sign_type||''}</span></div>
+          <div style="font-size:10px;color:${s.status==='signed'?'var(--text3)':'var(--gold)'};direction:ltr">${s.signed_at?(s.signed_at).slice(0,16).replace('T',' '):'بانتظار التوقيع'}</div>
+          ${s.serial_number?`<div style="font-size:10px;font-family:monospace;color:var(--accent)">${s.serial_number}</div>`:''}
+        </div>
+      </div>`).join('')}
+    </div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${canDownloadDoc(d)?`<a href="/api/documents/${docId}/download-signed" class="btn-primary btn-sm"><i class="fa-solid fa-download"></i> تحميل</a>`:''}
+      ${signUrl?`<a href="${signUrl}" class="btn-ghost btn-sm"><i class="fa-solid fa-signature"></i> توقيع</a>`:''}
+      ${firstSerial?`<button class="btn-ghost btn-sm" onclick="openQR('${firstSerial}','${t}')"><i class="fa-solid fa-qrcode"></i> QR</button>`:''}
+    </div>`;
+}
+
+function closeDrawer(){
+  document.getElementById('detail-drawer').classList.remove('open');
+}
+
+closeDrawer();
+loadArchive();
+</script>
+{% endblock %}

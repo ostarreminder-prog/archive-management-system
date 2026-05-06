@@ -1,0 +1,1180 @@
+{% extends "base.html" %}
+{% block title %}لوحة أدمن النظام{% endblock %}
+{% block page_title %}لوحة أدمن النظام{% endblock %}
+{% block page_sub %}إدارة المستخدمين، متابعة اللوقز، وتنبيهات الأمان{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openModal('new-user-modal')"><i class="fa-solid fa-user-plus"></i> مستخدم جديد</button>
+<button class="btn-ghost" onclick="refreshAll()"><i class="fa-solid fa-rotate"></i> تحديث</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.admin-tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;width:fit-content;margin-bottom:14px}
+.admin-tab{padding:8px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text3);border:none;background:none;font-family:'IBM Plex Sans Arabic',sans-serif}
+.admin-tab.active{background:var(--accent-dim);color:var(--accent)}
+
+.admin-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.admin-stat{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 10px;text-align:center}
+.admin-stat-val{font-size:20px;font-weight:800;line-height:1.1}
+.admin-stat-lbl{font-size:10px;color:var(--text3);margin-top:4px}
+
+.admin-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.admin-filters input,.admin-filters select{background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:8px 12px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:12px;outline:none}
+.admin-filters input{flex:1;min-width:180px;direction:rtl}
+.admin-filters input:focus,.admin-filters select:focus{border-color:var(--accent)}
+
+.alert-list{display:flex;flex-direction:column}
+.alert-item{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.alert-item:last-child{border-bottom:none}
+.alert-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:6px}
+.alert-main{flex:1;min-width:0}
+.alert-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.alert-meta{font-size:11px;color:var(--text2);margin-bottom:2px}
+.alert-details{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-time{font-size:10px;color:var(--text3);direction:ltr;white-space:nowrap;flex-shrink:0}
+
+.log-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.log-row:last-child{border-bottom:none}
+.log-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--accent),#b7791f);font-size:12px;font-weight:700;flex-shrink:0}
+.log-main{flex:1;min-width:0}
+.log-title{font-size:12px;font-weight:700}
+.log-details{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-time{font-size:10px;color:var(--text3);direction:ltr;white-space:nowrap}
+
+.tpl-default-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:700}
+.tpl-preview-wrap{max-height:60vh;overflow:auto;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px}
+.tpl-preview-images{display:grid;gap:8px;margin-bottom:8px}
+.tpl-preview-images img{width:100%;max-height:220px;object-fit:contain;background:#fff;border:1px solid var(--border);border-radius:8px}
+.tpl-preview-lines{background:#fff;border:1px dashed #e5e7eb;border-radius:8px;padding:10px;display:grid;gap:6px}
+.tpl-preview-lines div{font-size:12px;color:#000;line-height:1.7}
+.tpl-preview-modal .modal{width:min(94vw,1180px);max-width:1180px;max-height:88vh;padding:24px 28px;display:flex;flex-direction:column}
+.tpl-preview-modal .tpl-preview-wrap{flex:1;min-height:62vh;max-height:none;padding:16px}
+.tpl-preview-modal .tpl-preview-images{gap:12px;margin-bottom:12px}
+.tpl-preview-modal .tpl-preview-images img{max-height:420px}
+.tpl-preview-modal .tpl-preview-lines{padding:14px;gap:8px}
+.tpl-preview-modal .tpl-preview-lines div{font-size:13px;line-height:1.9}
+
+.hidden{display:none !important}
+@media (max-width:900px){
+  .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .tpl-preview-modal .modal{width:96vw;max-height:92vh;padding:18px}
+  .tpl-preview-modal .tpl-preview-wrap{min-height:50vh;padding:12px}
+  .tpl-preview-modal .tpl-preview-images img{max-height:280px}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="admin-stats" id="security-stats">
+  <div class="admin-stat"><div class="admin-stat-val" id="st-pending-devices" style="color:var(--gold)">—</div><div class="admin-stat-lbl">أجهزة بانتظار توثيق</div></div>
+  <div class="admin-stat"><div class="admin-stat-val" id="st-new-devices" style="color:var(--accent)">—</div><div class="admin-stat-lbl">أجهزة جديدة اليوم</div></div>
+  <div class="admin-stat"><div class="admin-stat-val" id="st-failed-auth" style="color:var(--red)">—</div><div class="admin-stat-lbl">محاولات فاشلة اليوم</div></div>
+  <div class="admin-stat"><div class="admin-stat-val" id="st-blocked" style="color:var(--purple)">—</div><div class="admin-stat-lbl">حسابات محظورة اليوم</div></div>
+</div>
+
+<div class="admin-tabs">
+  <button class="admin-tab active" onclick="switchTab('users',this)"><i class="fa-solid fa-users"></i> المستخدمون</button>
+  <button class="admin-tab" onclick="switchTab('logs',this)"><i class="fa-solid fa-clipboard-list"></i> اللوقز</button>
+  <button class="admin-tab" onclick="switchTab('security',this)"><i class="fa-solid fa-shield-halved"></i> تنبيهات الأمان</button>
+  <button class="admin-tab" onclick="switchTab('templates',this)"><i class="fa-solid fa-file-word"></i> القوالب</button>
+  <button class="admin-tab" onclick="switchTab('stamp-tpl',this)"><i class="fa-solid fa-stamp"></i> قالب الختم</button>
+</div>
+
+<!-- Users -->
+<div id="tab-users">
+  <div class="admin-filters">
+    <input id="users-search" placeholder="بحث بالاسم أو البريد..." oninput="renderUsers()">
+    <select id="users-role-filter" onchange="renderUsers()">
+      <option value="">كل الأدوار</option>
+      <option value="admin">مدير عام</option>
+      <option value="manager">مدير</option>
+      <option value="user">موظف</option>
+    </select>
+    <select id="users-section-filter" onchange="renderUsers()">
+      <option value="">كل الأقسام</option>
+    </select>
+    <button class="btn-ghost" onclick="openSectionModal('new')"><i class="fa-solid fa-folder-plus"></i> قسم جديد</button>
+  </div>
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="table-title"><i class="fa-solid fa-users"></i> إدارة المستخدمين</div>
+      <div id="users-count" style="font-size:11px;color:var(--text3)">—</div>
+    </div>
+    <div id="users-table"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div></div>
+  </div>
+</div>
+
+<!-- Logs -->
+<div id="tab-logs" class="hidden">
+  <div class="admin-filters">
+    <input id="logs-search" placeholder="بحث بالاسم أو الحدث..." oninput="renderLogs()">
+    <select id="logs-source" onchange="renderLogs()">
+      <option value="activity">سجل العمليات</option>
+      <option value="logins">سجل الدخول</option>
+    </select>
+    <select id="logs-user-filter" onchange="renderLogs()">
+      <option value="">كل المستخدمين</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="table-title"><i class="fa-solid fa-clipboard-list"></i> متابعة اللوقز</div>
+      <div id="logs-count" style="font-size:11px;color:var(--text3)">—</div>
+    </div>
+    <div id="logs-list"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div></div>
+  </div>
+</div>
+
+<!-- Security -->
+<div id="tab-security" class="hidden">
+  <div class="admin-filters">
+    <input id="alerts-search" placeholder="بحث باسم المستخدم أو نوع التنبيه..." oninput="renderSecurityAlerts()">
+    <select id="alerts-severity" onchange="renderSecurityAlerts()">
+      <option value="">كل المستويات</option>
+      <option value="critical">حرج</option>
+      <option value="high">عالي</option>
+      <option value="medium">متوسط</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="table-title"><i class="fa-solid fa-shield-halved"></i> تنبيهات النظام الأمنية</div>
+      <div id="alerts-count" style="font-size:11px;color:var(--text3)">—</div>
+    </div>
+    <div id="alerts-list"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div></div>
+  </div>
+</div>
+
+<!-- Templates -->
+<div id="tab-templates" class="hidden">
+  <div class="admin-filters">
+    <input id="templates-search" placeholder="بحث باسم القالب..." oninput="renderTemplates()">
+    <button class="btn-ghost" onclick="renderTemplates()"><i class="fa-solid fa-filter"></i> تطبيق</button>
+  </div>
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="table-title"><i class="fa-solid fa-file-word"></i> إدارة قوالب DOCX</div>
+      <div id="templates-count" style="font-size:11px;color:var(--text3)">—</div>
+    </div>
+    <div id="templates-table"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div></div>
+  </div>
+</div>
+
+<!-- Stamp Templates (multi-template) -->
+<div id="tab-stamp-tpl" class="hidden">
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="table-title"><i class="fa-solid fa-stamp"></i> قوالب الختم</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="stamp-tpl-file" accept=".png,.jpg,.jpeg,.webp" style="display:none" onchange="uploadStampTpl()">
+        <button class="btn-primary" onclick="document.getElementById('stamp-tpl-file').click()">
+          <i class="fa-solid fa-upload"></i> رفع قالب جديد
+        </button>
+        <button class="btn-ghost" onclick="showGenStampsModal()" id="btn-gen-stamps">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> توليد أختام المدراء
+        </button>
+      </div>
+    </div>
+
+    <!-- name input shown when uploading -->
+    <div id="stamp-tpl-name-wrap" style="display:none;padding:10px 20px;border-bottom:1px solid var(--border2);background:var(--card2);gap:8px;align-items:center">
+      <input type="text" id="stamp-tpl-name-input" placeholder="اسم القالب (اختياري)"
+             style="flex:1;padding:7px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">
+      <button class="btn-primary" id="stamp-tpl-confirm-btn" onclick="confirmStampTplUpload()">
+        <i class="fa-solid fa-check"></i> رفع
+      </button>
+      <button class="btn-ghost" onclick="cancelStampTplUpload()">إلغاء</button>
+    </div>
+
+    <div id="stamp-tpl-table-wrap">
+      <div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div>
+    </div>
+  </div>
+
+  <!-- Position editor panel (hidden by default) -->
+  <div id="stamp-pos-editor" style="display:none;margin-top:16px">
+    <div class="table-wrap">
+      <div class="table-head">
+        <div class="table-title"><i class="fa-solid fa-crosshairs"></i> تعديل موضع النص في القالب</div>
+        <button class="btn-ghost" onclick="closeStampPosEditor()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div style="padding:20px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+        <div style="position:relative;flex-shrink:0">
+          <img id="stamp-pos-preview" src="" alt="معاينة"
+               style="max-width:320px;max-height:200px;object-fit:contain;border:1px solid var(--border2);border-radius:8px;background:#fff;display:block"
+               onclick="setPosByClick(event)">
+          <div id="stamp-pos-crosshair" style="position:absolute;width:14px;height:14px;border:2px solid #e00;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none"></div>
+        </div>
+        <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:12px;color:var(--text3)">انقر على الصورة لتحديد موضع النص، أو أدخل القيم يدوياً (0–100%).</div>
+          <label style="font-size:13px;font-weight:600">
+            X (أفقي)
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+              <input type="range" id="pos-x-range" min="0" max="100" step="1" value="25"
+                     oninput="syncPosInputs('x')" style="flex:1">
+              <input type="number" id="pos-x-num" min="0" max="100" step="1" value="25"
+                     oninput="syncPosInputs('x')"
+                     style="width:56px;padding:4px 8px;border:1px solid var(--border2);border-radius:6px;font-size:13px;background:var(--card);color:var(--text)">
+              <span style="font-size:12px;color:var(--text3)">%</span>
+            </div>
+          </label>
+          <label style="font-size:13px;font-weight:600">
+            Y (عمودي)
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+              <input type="range" id="pos-y-range" min="0" max="100" step="1" value="8"
+                     oninput="syncPosInputs('y')" style="flex:1">
+              <input type="number" id="pos-y-num" min="0" max="100" step="1" value="8"
+                     oninput="syncPosInputs('y')"
+                     style="width:56px;padding:4px 8px;border:1px solid var(--border2);border-radius:6px;font-size:13px;background:var(--card);color:var(--text)">
+              <span style="font-size:12px;color:var(--text3)">%</span>
+            </div>
+          </label>
+          <button class="btn-primary" onclick="saveStampTplPos()">
+            <i class="fa-solid fa-floppy-disk"></i> حفظ الموضع
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Generate stamps modal -->
+<div class="modal-overlay" id="gen-stamps-modal" onclick="if(event.target===this)closeGenStampsModal()">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title"><i class="fa-solid fa-wand-magic-sparkles"></i> توليد أختام المدراء</div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">القالب المستخدم</label>
+      <select id="gen-stamps-tpl-select" style="width:100%;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">
+        <option value="">القالب الافتراضي</option>
+      </select>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px;user-select:none">
+      <input type="checkbox" id="gen-stamps-force" style="width:16px;height:16px;cursor:pointer">
+      إعادة توليد حتى لو الختم موجود مسبقاً (يحذف القديم)
+    </label>
+    <div id="gen-stamps-result" style="font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:10px;min-height:32px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-primary" id="gen-stamps-btn" onclick="generateManagerStamps()">
+        <i class="fa-solid fa-stamp"></i> توليد
+      </button>
+      <button class="btn-ghost" onclick="closeGenStampsModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- New user modal -->
+<div class="modal-overlay" id="new-user-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-user-plus"></i> مستخدم جديد</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="mfield" style="grid-column:1/-1">
+        <label>الاسم الكامل</label>
+        <input type="text" id="n-name" placeholder="محمد أحمد العمري">
+      </div>
+      <div class="mfield">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="n-email" placeholder="name@company.sa">
+      </div>
+      <div class="mfield">
+        <label>رقم الجوال</label>
+        <input type="text" id="n-phone" placeholder="+966500000000">
+      </div>
+      <div class="mfield">
+        <label>المسمى الوظيفي</label>
+        <input type="text" id="n-job" placeholder="مدير التشغيل">
+      </div>
+      <div class="mfield">
+        <label>الدور</label>
+        <select id="n-role">
+          <option value="user">موظف</option>
+          <option value="manager">مدير</option>
+          <option value="admin" class="role-admin-opt">مدير عام</option>
+          <option value="sys_admin" class="role-sys-admin-opt">ادمن</option>
+        </select>
+      </div>
+      <div class="mfield">
+        <label>القسم</label>
+        <div style="display:flex;gap:6px">
+          <select id="n-section" style="flex:1"></select>
+          <button type="button" class="btn-ghost" onclick="openSectionModal('new')"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </div>
+      <div class="mfield" id="n-stamp-field" style="grid-column:1/-1;display:none">
+        <label>نص الختم (اختياري)</label>
+        <input type="text" id="n-stamp" placeholder="إدارة تقنية المعلومات">
+      </div>
+    </div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('new-user-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="createUser()">إنشاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit user modal -->
+<div class="modal-overlay" id="edit-user-modal">
+  <div class="modal">
+    <div class="modal-title">✏️ تعديل المستخدم</div>
+    <input type="hidden" id="e-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="mfield" style="grid-column:1/-1">
+        <label>الاسم الكامل</label>
+        <input type="text" id="e-name">
+      </div>
+      <div class="mfield">
+        <label>رقم الجوال</label>
+        <input type="text" id="e-phone">
+      </div>
+      <div class="mfield">
+        <label>المسمى الوظيفي</label>
+        <input type="text" id="e-job">
+      </div>
+      <div class="mfield">
+        <label>الدور</label>
+        <select id="e-role">
+          <option value="user">موظف</option>
+          <option value="manager">مدير</option>
+          <option value="admin" class="role-admin-opt">مدير عام</option>
+          <option value="sys_admin" class="role-sys-admin-opt">ادمن</option>
+        </select>
+      </div>
+      <div class="mfield">
+        <label>القسم</label>
+        <div style="display:flex;gap:6px">
+          <select id="e-section" style="flex:1"></select>
+          <button type="button" class="btn-ghost" onclick="openSectionModal('edit')"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </div>
+      <div class="mfield" style="grid-column:1/-1">
+        <label>نص الختم (اختياري)</label>
+        <input type="text" id="e-stamp">
+      </div>
+    </div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('edit-user-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveUserEdit()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="section-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title"><i class="fa-solid fa-folder-plus"></i> قسم جديد</div>
+    <div class="mfield">
+      <label>اسم القسم</label>
+      <input type="text" id="s-name" placeholder="مثال: الشؤون القانونية">
+    </div>
+    <div class="mfield">
+      <label>اختصار القسم</label>
+      <input type="text" id="s-code" maxlength="2" placeholder="LG" style="direction:ltr;text-transform:uppercase">
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px">سيتم توليد أرقام الأرشيف من هذا الاختصار مثل LG01</div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('section-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="createSection()">إنشاء القسم</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay tpl-preview-modal" id="template-preview-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-eye"></i> معاينة القالب</div>
+    <div id="template-preview-title" style="font-size:12px;color:var(--text2);margin-bottom:10px">—</div>
+    <div id="template-preview-body" class="tpl-preview-wrap">جارٍ التحميل...</div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('template-preview-modal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CURRENT_ROLE = {{ session.get('user_role')|tojson }};
+
+let usersData = [];
+let sectionsData = [];
+let activityData = [];
+let loginData = [];
+let securityAlerts = [];
+let templatesData = [];
+let defaultTemplateName = '';
+let currentSectionTarget = 'new';
+
+const roleLabel = {admin:'مدير عام', manager:'مدير', user:'موظف'};
+const roleBadge = {admin:'badge-admin', manager:'badge-manager', user:'badge-user'};
+const severityBadge = {critical:'badge-rejected', high:'badge-pending', medium:'badge-manager'};
+
+function severityColor(level='medium'){
+  if(level === 'critical') return 'var(--red)';
+  if(level === 'high') return 'var(--gold)';
+  return 'var(--accent)';
+}
+
+function normalizeRoleForForm(role){
+  const value = String(role || 'user').toLowerCase();
+  return ['admin','manager','user','sys_admin'].includes(value) ? value : 'user';
+}
+
+function applyRoleOptionsByActor(){
+  if(CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'sys_admin') return;
+  document.querySelectorAll('.role-admin-opt,.role-sys-admin-opt').forEach(opt=>opt.remove());
+}
+
+function toggleNewStampField(){
+  const role = document.getElementById('n-role')?.value;
+  const field = document.getElementById('n-stamp-field');
+  if(field) field.style.display = role === 'user' ? 'none' : '';
+}
+
+async function readJson(res){
+  const data = await res.json();
+  if(!res.ok){
+    throw new Error(data.error || 'تعذر تحميل البيانات');
+  }
+  return data;
+}
+
+function esc(value=''){
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function loadAllData(){
+  const [users, sections, activity, logins, security, templatesPack] = await Promise.all([
+    fetch('/api/users').then(readJson),
+    fetch('/api/archive-sections').then(readJson),
+    fetch('/api/admin/activity').then(readJson),
+    fetch('/api/admin/logins').then(readJson),
+    fetch('/api/admin/security-alerts').then(readJson),
+    fetch('/api/admin/docx-templates').then(readJson),
+  ]);
+
+  usersData = Array.isArray(users) ? users : [];
+  sectionsData = Array.isArray(sections) ? sections : [];
+  activityData = Array.isArray(activity.logs) ? activity.logs : [];
+  loginData = Array.isArray(logins.logs) ? logins.logs : [];
+  securityAlerts = Array.isArray(security.alerts) ? security.alerts : [];
+  templatesData = Array.isArray(templatesPack.templates) ? templatesPack.templates : [];
+  defaultTemplateName = String(templatesPack.default_template || '').trim();
+
+  document.getElementById('st-pending-devices').textContent = security.summary?.pending_devices ?? 0;
+  document.getElementById('st-new-devices').textContent = security.summary?.new_devices_today ?? 0;
+  document.getElementById('st-failed-auth').textContent = security.summary?.failed_auth_today ?? 0;
+  document.getElementById('st-blocked').textContent = security.summary?.blocked_accounts_today ?? 0;
+
+  const userSel = document.getElementById('logs-user-filter');
+  const selected = userSel.value;
+  userSel.innerHTML = '<option value="">كل المستخدمين</option>';
+  usersData.forEach(user => {
+    const option = document.createElement('option');
+    option.value = String(user.id);
+    option.textContent = user.name;
+    userSel.appendChild(option);
+  });
+  userSel.value = selected;
+
+  renderSectionOptions();
+
+  renderUsers();
+  renderLogs();
+  renderSecurityAlerts();
+  renderTemplates();
+}
+
+function renderSectionOptions(newSelected='', editSelected=''){
+  const targets = [
+    {id:'n-section', selected:newSelected},
+    {id:'e-section', selected:editSelected},
+    {id:'users-section-filter', selected:document.getElementById('users-section-filter')?.value || ''}
+  ];
+
+  targets.forEach(target => {
+    const el = document.getElementById(target.id);
+    if(!el) return;
+    const isFilter = target.id === 'users-section-filter';
+    const selectedValue = String(target.selected || '');
+    el.innerHTML = isFilter ? '<option value="">كل الأقسام</option>' : '<option value="">اختر القسم</option>';
+    sectionsData.forEach(section => {
+      const option = document.createElement('option');
+      option.value = String(section.id);
+      option.textContent = `${section.section_name} (${section.section_code})`;
+      if(String(section.id) === selectedValue) option.selected = true;
+      el.appendChild(option);
+    });
+  });
+}
+
+function openSectionModal(target='new'){
+  currentSectionTarget = target;
+  document.getElementById('s-name').value = '';
+  document.getElementById('s-code').value = '';
+  openModal('section-modal');
+}
+
+async function createSection(){
+  const body = {
+    section_name: document.getElementById('s-name').value.trim(),
+    section_code: document.getElementById('s-code').value.trim().toUpperCase(),
+  };
+  if(!body.section_name || !/^[A-Za-z]{2}$/.test(body.section_code)){
+    return toast('أدخل اسم القسم واختصاراً من حرفين إنجليزيين', 'error');
+  }
+
+  try {
+    const res = await fetch('/api/archive-sections', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      return toast(data.error || 'فشل إنشاء القسم', 'error');
+    }
+
+    sectionsData.push(data.section);
+    sectionsData.sort((a,b)=> String(a.section_name||'').localeCompare(String(b.section_name||''), 'ar'));
+    renderSectionOptions(currentSectionTarget === 'new' ? data.section.id : '', currentSectionTarget === 'edit' ? data.section.id : '');
+    closeModal('section-modal');
+    toast('تم إنشاء القسم');
+  } catch {
+    toast('فشل إنشاء القسم', 'error');
+  }
+}
+
+function renderUsers(){
+  const q = (document.getElementById('users-search').value || '').toLowerCase().trim();
+  const roleFilter = document.getElementById('users-role-filter').value;
+  const sectionFilter = document.getElementById('users-section-filter').value;
+
+  const rows = usersData.filter(user => {
+    const name = String(user.name || '').toLowerCase();
+    const email = String(user.email || '').toLowerCase();
+    const sectionName = String(user.archive_section || '').toLowerCase();
+    const sectionCode = String(user.archive_section_code || '').toLowerCase();
+    const role = normalizeRoleForForm(user.role);
+    return (!q || name.includes(q) || email.includes(q) || sectionName.includes(q) || sectionCode.includes(q))
+      && (!roleFilter || role === roleFilter)
+      && (!sectionFilter || String(user.archive_section_id || '') === String(sectionFilter));
+  });
+
+  document.getElementById('users-count').textContent = `${rows.length} مستخدم`;
+  const table = document.getElementById('users-table');
+  if(!rows.length){
+    table.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><div class="empty-text">لا توجد نتائج</div></div>';
+    return;
+  }
+
+  table.innerHTML = `<table>
+    <thead><tr><th>المستخدم</th><th>الدور</th><th>القسم</th><th>الجوال</th><th>المسمى</th><th>الحالة</th><th></th></tr></thead>
+    <tbody>
+      ${rows.map(user => {
+        const role = normalizeRoleForForm(user.role);
+        return `<tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#b7791f);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${(user.name||'?')[0]}</div>
+              <div>
+                <div style="font-weight:600;font-size:13px">${user.name || '—'}</div>
+                <div style="font-size:11px;color:var(--text3)">${user.email || '—'}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge ${roleBadge[role] || 'badge-user'}">${roleLabel[role] || role}</span></td>
+          <td style="font-size:12px;color:var(--text2)">${user.archive_section || '—'} <span style="direction:ltr;font-family:monospace">(${user.archive_section_code || 'GN'})</span></td>
+          <td style="font-size:12px;color:var(--text2);direction:ltr">${user.phone || '—'}</td>
+          <td style="font-size:12px;color:var(--text2)">${user.job_title || '—'}</td>
+          <td><span class="badge ${user.is_active ? 'badge-approved' : 'badge-rejected'}">${user.is_active ? 'نشط' : 'موقوف'}</span></td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn-ghost" onclick="openEditUserById(${user.id})">تعديل</button>
+              ${user.is_active ? `<button class="btn-danger" onclick="deactivateUserById(${user.id})">إيقاف</button>` : ''}
+              <button class="btn-danger" style="background:#7f1d1d" onclick="permanentDeleteUserById(${user.id})">حذف نهائي</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderLogs(){
+  const q = (document.getElementById('logs-search').value || '').toLowerCase().trim();
+  const source = document.getElementById('logs-source').value;
+  const userFilter = document.getElementById('logs-user-filter').value;
+
+  const data = source === 'logins' ? loginData : activityData;
+  const filtered = data.filter(item => {
+    const userId = String(item.user_id || '');
+    const userName = String(item.user_name || '').toLowerCase();
+    const action = String(item.action || item.event || '').toLowerCase();
+    const details = String(item.details || '').toLowerCase();
+    return (!userFilter || userFilter === userId) && (!q || userName.includes(q) || action.includes(q) || details.includes(q));
+  });
+
+  document.getElementById('logs-count').textContent = `${filtered.length} سجل`;
+  const list = document.getElementById('logs-list');
+  if(!filtered.length){
+    list.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><div class="empty-text">لا توجد نتائج</div></div>';
+    return;
+  }
+
+  list.innerHTML = filtered.slice(0, 400).map(item => {
+    const title = source === 'logins' ? (item.event || 'login') : (item.action || 'action');
+    const details = source === 'logins'
+      ? `${item.device_type || ''} ${item.os_name || ''} ${item.browser || ''} — ${item.ip_address || ''}`.trim()
+      : (item.details || '—');
+
+    return `<div class="log-row">
+      <div class="log-av">${(item.user_name || '?')[0]}</div>
+      <div class="log-main">
+        <div class="log-title">${title} — ${item.user_name || 'مجهول'}</div>
+        <div class="log-details">${details || '—'}</div>
+      </div>
+      <div class="log-time">${String(item.timestamp || '').replace('T',' ').slice(0,16)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSecurityAlerts(){
+  const q = (document.getElementById('alerts-search').value || '').toLowerCase().trim();
+  const severity = document.getElementById('alerts-severity').value;
+
+  const filtered = securityAlerts.filter(alert => {
+    const title = String(alert.title || '').toLowerCase();
+    const user = String(alert.user_name || '').toLowerCase();
+    const details = String(alert.details || '').toLowerCase();
+    const level = String(alert.severity || 'medium');
+    return (!severity || severity === level) && (!q || title.includes(q) || user.includes(q) || details.includes(q));
+  });
+
+  document.getElementById('alerts-count').textContent = `${filtered.length} تنبيه`;
+  const list = document.getElementById('alerts-list');
+  if(!filtered.length){
+    list.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-circle-check"></i></div><div class="empty-text">لا توجد تنبيهات حالياً</div></div>';
+    return;
+  }
+
+  list.innerHTML = `<div class="alert-list">${filtered.slice(0, 400).map(alert => `
+    <div class="alert-item">
+      <div class="alert-dot" style="background:${severityColor(alert.severity)}"></div>
+      <div class="alert-main">
+        <div class="alert-title">${alert.title}</div>
+        <div class="alert-meta">
+          <span class="badge ${severityBadge[alert.severity] || 'badge-manager'}">${alert.severity === 'critical' ? 'حرج' : (alert.severity === 'high' ? 'عالي' : 'متوسط')}</span>
+          <span style="margin-right:6px">${alert.user_name || 'مجهول'}</span>
+        </div>
+        <div class="alert-details">${alert.details || '—'}</div>
+      </div>
+      <div class="alert-time">${String(alert.occurred_at || '').replace('T',' ').slice(0,16)}</div>
+    </div>
+  `).join('')}</div>`;
+}
+
+function renderTemplates(){
+  const q = (document.getElementById('templates-search')?.value || '').toLowerCase().trim();
+  const rows = templatesData.filter(item => {
+    const name = String(item.file_name || '').toLowerCase();
+    return !q || name.includes(q);
+  });
+
+  const countEl = document.getElementById('templates-count');
+  if(countEl) countEl.textContent = `${rows.length} قالب`;
+
+  const table = document.getElementById('templates-table');
+  if(!table) return;
+
+  if(!rows.length){
+    table.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-file-circle-xmark"></i></div><div class="empty-text">لا توجد قوالب مطابقة</div></div>';
+    return;
+  }
+
+  table.innerHTML = `<table>
+    <thead><tr><th>اسم القالب</th><th>الحجم</th><th>آخر تعديل</th><th>الحالة</th><th></th></tr></thead>
+    <tbody>
+      ${rows.map(item => {
+        const fileName = String(item.file_name || '');
+        const isDefault = fileName === defaultTemplateName;
+        return `<tr>
+          <td style="font-size:12px;font-weight:700;direction:ltr">${esc(fileName)}</td>
+          <td style="font-size:12px;color:var(--text2)">${Number(item.size_kb || 0)} KB</td>
+          <td style="font-size:11px;color:var(--text3)">${esc(item.updated_at || '—')}</td>
+          <td>${isDefault ? '<span class="tpl-default-pill"><i class="fa-solid fa-star"></i> افتراضي</span>' : '<span class="badge badge-draft">غير افتراضي</span>'}</td>
+          <td>
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+              <button class="btn-ghost" onclick='previewTemplate(${JSON.stringify(fileName)})'><i class="fa-solid fa-eye"></i> معاينة</button>
+              ${isDefault ? '' : `<button class="btn-primary" onclick='setDefaultTemplate(${JSON.stringify(fileName)})'><i class="fa-solid fa-star"></i> تعيين افتراضي</button>`}
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function setDefaultTemplate(fileName=''){
+  const templateName = String(fileName || '').trim();
+  if(!templateName) return;
+
+  try {
+    const res = await fetch('/api/admin/docx-templates/default', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({template_name: templateName})
+    });
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      return toast(data.error || 'تعذر حفظ القالب الافتراضي', 'error');
+    }
+
+    defaultTemplateName = String(data.default_template || '').trim();
+    templatesData = templatesData.map(item => ({
+      ...item,
+      is_default: String(item.file_name || '') === defaultTemplateName
+    }));
+    renderTemplates();
+    toast('تم تحديث القالب الافتراضي');
+  } catch {
+    toast('تعذر الاتصال بالخادم', 'error');
+  }
+}
+
+async function previewTemplate(fileName=''){
+  const templateName = String(fileName || '').trim();
+  if(!templateName) return;
+
+  const titleEl = document.getElementById('template-preview-title');
+  const bodyEl = document.getElementById('template-preview-body');
+  if(titleEl) titleEl.innerHTML = `<strong style="direction:ltr">${esc(templateName)}</strong>`;
+  if(bodyEl) bodyEl.innerHTML = 'جارٍ تحميل المعاينة...';
+
+  openModal('template-preview-modal');
+
+  try {
+    const res = await fetch(`/api/docx-templates/${encodeURIComponent(templateName)}/preview`, {
+      headers: {'Accept':'application/json'}
+    });
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      throw new Error(data.error || 'تعذر معاينة القالب');
+    }
+
+    const preview = data.preview || {};
+    const images = Array.isArray(preview.header_images) ? preview.header_images.filter(Boolean) : [];
+    const headerLines = Array.isArray(preview.header_lines) ? preview.header_lines.filter(Boolean) : [];
+    const bodyLines = Array.isArray(preview.body_lines) ? preview.body_lines.filter(Boolean) : [];
+    const lines = [...headerLines, ...bodyLines];
+
+    if(bodyEl){
+      bodyEl.innerHTML = `
+        ${images.length ? `<div class="tpl-preview-images">${images.map(src => `<img src="${src}" alt="preview">`).join('')}</div>` : ''}
+        <div class="tpl-preview-lines">
+          ${lines.length ? lines.map(line => `<div>${esc(line)}</div>`).join('') : '<div style="color:var(--text3)">لا توجد أسطر نصية متاحة للمعاينة</div>'}
+        </div>
+      `;
+    }
+  } catch (err) {
+    if(bodyEl) bodyEl.innerHTML = `<div style="font-size:12px;color:var(--red)">${esc(err.message || 'تعذر تحميل المعاينة')}</div>`;
+  }
+}
+
+function switchTab(tabName, button){
+  document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('active'));
+  button.classList.add('active');
+  document.getElementById('tab-users').classList.toggle('hidden', tabName !== 'users');
+  document.getElementById('tab-logs').classList.toggle('hidden', tabName !== 'logs');
+  document.getElementById('tab-security').classList.toggle('hidden', tabName !== 'security');
+  document.getElementById('tab-templates').classList.toggle('hidden', tabName !== 'templates');
+  document.getElementById('tab-stamp-tpl').classList.toggle('hidden', tabName !== 'stamp-tpl');
+  if(tabName === 'stamp-tpl') loadStampTemplates();
+}
+
+async function createUser(){
+  const body = {
+    name: document.getElementById('n-name').value.trim(),
+    email: document.getElementById('n-email').value.trim(),
+    phone: document.getElementById('n-phone').value.trim(),
+    job_title: document.getElementById('n-job').value.trim(),
+    role: normalizeRoleForForm(document.getElementById('n-role').value),
+    archive_section_id: document.getElementById('n-section').value,
+    stamp_text: document.getElementById('n-stamp').value.trim(),
+  };
+
+  if(!body.name || !body.email || !body.phone){
+    return toast('أدخل الحقول المطلوبة', 'error');
+  }
+
+  try {
+    const res = await fetch('/api/users', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),
+    });
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      return toast(data.error || 'فشل إنشاء المستخدم', 'error');
+    }
+    closeModal('new-user-modal');
+    ['n-name','n-email','n-phone','n-job','n-stamp'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('n-section').value = '';
+    document.getElementById('n-role').value = 'user';
+    toggleNewStampField();
+    await loadAllData();
+    toast('تم إنشاء المستخدم');
+  } catch {
+    toast('فشل إنشاء المستخدم', 'error');
+  }
+}
+
+function openEditUser(user){
+  document.getElementById('e-id').value = user.id;
+  document.getElementById('e-name').value = user.name || '';
+  document.getElementById('e-phone').value = user.phone || '';
+  document.getElementById('e-job').value = user.job_title || '';
+  document.getElementById('e-role').value = normalizeRoleForForm(user.role);
+  renderSectionOptions('', String(user.archive_section_id || ''));
+  document.getElementById('e-section').value = String(user.archive_section_id || '');
+  document.getElementById('e-stamp').value = user.stamp_text || '';
+  openModal('edit-user-modal');
+}
+
+function openEditUserById(userId){
+  const user = usersData.find(item => Number(item.id) === Number(userId));
+  if(!user) return;
+  openEditUser(user);
+}
+
+async function saveUserEdit(){
+  const id = document.getElementById('e-id').value;
+  const body = {
+    name: document.getElementById('e-name').value.trim(),
+    phone: document.getElementById('e-phone').value.trim(),
+    job_title: document.getElementById('e-job').value.trim(),
+    role: normalizeRoleForForm(document.getElementById('e-role').value),
+    archive_section_id: document.getElementById('e-section').value,
+    stamp_text: document.getElementById('e-stamp').value.trim(),
+  };
+
+  try {
+    const res = await fetch(`/api/users/${id}`, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),
+    });
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      return toast(data.error || 'فشل التعديل', 'error');
+    }
+    closeModal('edit-user-modal');
+    await loadAllData();
+    toast('تم حفظ التعديلات');
+  } catch {
+    toast('فشل التعديل', 'error');
+  }
+}
+
+async function deactivateUser(userId, userName){
+  if(!confirm(`هل تريد إيقاف ${userName}؟`)) return;
+  try {
+    const res = await fetch(`/api/users/${userId}`, {method:'DELETE'});
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      return toast(data.error || 'فشل الإيقاف', 'error');
+    }
+    await loadAllData();
+    toast('تم إيقاف المستخدم');
+  } catch {
+    toast('فشل الإيقاف', 'error');
+  }
+}
+
+function deactivateUserById(userId){
+  const user = usersData.find(item => Number(item.id) === Number(userId));
+  const userName = user?.name || 'هذا المستخدم';
+  deactivateUser(userId, userName);
+}
+
+async function permanentDeleteUser(userId, userName){
+  if(!confirm(`هل تريد حذف ${userName} نهائياً من قاعدة البيانات؟`)) return;
+  try {
+    const res = await fetch(`/api/users/${userId}/permanent-delete`, {method:'DELETE'});
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      return toast(data.error || 'فشل الحذف النهائي', 'error');
+    }
+    await loadAllData();
+    toast('تم الحذف النهائي');
+  } catch {
+    toast('فشل الحذف النهائي', 'error');
+  }
+}
+
+function permanentDeleteUserById(userId){
+  const user = usersData.find(item => Number(item.id) === Number(userId));
+  const userName = user?.name || 'هذا المستخدم';
+  permanentDeleteUser(userId, userName);
+}
+
+async function refreshAll(){
+  await loadAllData();
+  toast('تم التحديث');
+}
+
+// ── قوالب الختم — JS ─────────────────────────────────────────────────────
+let _stampTplPendingFile = null;   // holds File object before name is confirmed
+let _stampPosEditorId   = null;   // tpl id being position-edited
+
+async function loadStampTemplates(){
+  const wrap = document.getElementById('stamp-tpl-table-wrap');
+  try{
+    const list = await fetch('/api/admin/stamp-templates').then(r=>r.json());
+    if(!Array.isArray(list) || list.length === 0){
+      wrap.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-image"></i></div><div class="empty-text">لا توجد قوالب ختم بعد — ارفع قالباً باستخدام الزر أعلاه</div></div>';
+      return;
+    }
+    let html = `<table class="data-table"><thead><tr>
+      <th style="width:72px">معاينة</th>
+      <th>الاسم</th>
+      <th style="width:130px">موضع النص</th>
+      <th style="width:100px">الحجم</th>
+      <th style="width:150px">الإجراءات</th>
+    </tr></thead><tbody>`;
+    for(const t of list){
+      const def = t.is_default
+        ? '<span style="background:#0f34a0;color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;margin-right:6px">افتراضي</span>'
+        : '';
+      html += `<tr>
+        <td><img src="${t.preview_url}?t=${Date.now()}" alt="" style="width:60px;height:38px;object-fit:contain;border:1px solid var(--border2);border-radius:6px;background:#fff"></td>
+        <td>${escHtml(t.name)}${def}</td>
+        <td style="font-size:11px;color:var(--text3)">
+          X: ${Math.round(t.text_x_ratio*100)}% &nbsp; Y: ${Math.round(t.text_y_ratio*100)}%
+        </td>
+        <td style="font-size:11px;color:var(--text3)">${t.size_kb} KB</td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="openStampPosEditor(${t.id})" title="تعديل الموضع">
+              <i class="fa-solid fa-crosshairs"></i>
+            </button>
+            ${!t.is_default ? `<button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="setDefaultStampTpl(${t.id})" title="تعيين افتراضياً">
+              <i class="fa-solid fa-star"></i>
+            </button>` : ''}
+            <button class="btn-ghost" style="font-size:11px;padding:4px 8px;color:#e55" onclick="deleteStampTpl(${t.id})" title="حذف">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+
+    // populate generate-stamps dropdown
+    const sel = document.getElementById('gen-stamps-tpl-select');
+    if(sel){
+      sel.innerHTML = '<option value="">القالب الافتراضي</option>';
+      list.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name + (t.is_default ? ' (افتراضي)' : '');
+        sel.appendChild(opt);
+      });
+    }
+  }catch(e){ console.error(e); wrap.innerHTML = '<div class="empty"><div class="empty-text">خطأ في التحميل</div></div>'; }
+}
+
+function uploadStampTpl(){
+  const fileInput = document.getElementById('stamp-tpl-file');
+  const file = fileInput.files[0];
+  if(!file) return;
+  _stampTplPendingFile = file;
+  document.getElementById('stamp-tpl-name-input').value = file.name.replace(/\.[^.]+$/, '');
+  document.getElementById('stamp-tpl-name-wrap').style.display = 'flex';
+}
+
+async function confirmStampTplUpload(){
+  if(!_stampTplPendingFile) return;
+  const name = document.getElementById('stamp-tpl-name-input').value.trim();
+  const fd = new FormData();
+  fd.append('template', _stampTplPendingFile);
+  if(name) fd.append('name', name);
+  const btn = document.getElementById('stamp-tpl-confirm-btn');
+  btn.disabled = true;
+  try{
+    const res = await fetch('/api/admin/stamp-templates/upload',{method:'POST',body:fd}).then(r=>r.json());
+    if(res.success){ toast('تم رفع قالب الختم'); loadStampTemplates(); cancelStampTplUpload(); }
+    else toast(res.error||'فشل الرفع','error');
+  }catch(e){ toast('خطأ في الرفع','error'); }
+  btn.disabled = false;
+  document.getElementById('stamp-tpl-file').value = '';
+}
+
+function cancelStampTplUpload(){
+  _stampTplPendingFile = null;
+  document.getElementById('stamp-tpl-name-wrap').style.display = 'none';
+  document.getElementById('stamp-tpl-name-input').value = '';
+  document.getElementById('stamp-tpl-file').value = '';
+}
+
+async function deleteStampTpl(id){
+  if(!confirm('هل تريد حذف هذا القالب؟')) return;
+  const res = await fetch(`/api/admin/stamp-templates/${id}`,{method:'DELETE'}).then(r=>r.json());
+  if(res.success){ toast('تم الحذف'); loadStampTemplates(); }
+  else toast(res.error||'فشل الحذف','error');
+}
+
+async function setDefaultStampTpl(id){
+  const res = await fetch(`/api/admin/stamp-templates/${id}/default`,{method:'POST'}).then(r=>r.json());
+  if(res.success){ toast('تم التعيين كقالب افتراضي'); loadStampTemplates(); }
+  else toast('فشل التعيين','error');
+}
+
+// ── Position editor ──────────────────────────────────────────────────────
+async function openStampPosEditor(id){
+  _stampPosEditorId = id;
+  const resp = await fetch('/api/admin/stamp-templates').then(r=>r.json());
+  const tpl  = resp.find(t=>t.id===id);
+  if(!tpl) return;
+  document.getElementById('stamp-pos-preview').src = tpl.preview_url + '?t=' + Date.now();
+  const x = Math.round(tpl.text_x_ratio * 100);
+  const y = Math.round(tpl.text_y_ratio * 100);
+  document.getElementById('pos-x-range').value = x;
+  document.getElementById('pos-x-num').value   = x;
+  document.getElementById('pos-y-range').value = y;
+  document.getElementById('pos-y-num').value   = y;
+  updateCrosshair(x, y);
+  document.getElementById('stamp-pos-editor').style.display = '';
+  document.getElementById('stamp-pos-editor').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function closeStampPosEditor(){
+  document.getElementById('stamp-pos-editor').style.display = 'none';
+  _stampPosEditorId = null;
+}
+
+function syncPosInputs(axis){
+  const range = document.getElementById(`pos-${axis}-range`);
+  const num   = document.getElementById(`pos-${axis}-num`);
+  if(document.activeElement === range) num.value = range.value;
+  else range.value = num.value;
+  updateCrosshair(
+    parseInt(document.getElementById('pos-x-range').value),
+    parseInt(document.getElementById('pos-y-range').value)
+  );
+}
+
+function setPosByClick(e){
+  const img = e.currentTarget;
+  const rect = img.getBoundingClientRect();
+  const x = Math.round(((e.clientX - rect.left) / rect.width)  * 100);
+  const y = Math.round(((e.clientY - rect.top)  / rect.height) * 100);
+  document.getElementById('pos-x-range').value = x;
+  document.getElementById('pos-x-num').value   = x;
+  document.getElementById('pos-y-range').value = y;
+  document.getElementById('pos-y-num').value   = y;
+  updateCrosshair(x, y);
+}
+
+function updateCrosshair(x, y){
+  const ch   = document.getElementById('stamp-pos-crosshair');
+  const img  = document.getElementById('stamp-pos-preview');
+  ch.style.left = `${x}%`;
+  ch.style.top  = `${y}%`;
+}
+
+async function saveStampTplPos(){
+  if(!_stampPosEditorId) return;
+  const x = parseFloat(document.getElementById('pos-x-num').value) / 100;
+  const y = parseFloat(document.getElementById('pos-y-num').value) / 100;
+  const res = await fetch(`/api/admin/stamp-templates/${_stampPosEditorId}/position`,{
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({text_x_ratio: x, text_y_ratio: y})
+  }).then(r=>r.json());
+  if(res.success){ toast('تم حفظ الموضع'); loadStampTemplates(); closeStampPosEditor(); }
+  else toast(res.error||'فشل الحفظ','error');
+}
+
+// ── Generate stamps modal ─────────────────────────────────────────────────
+function showGenStampsModal(){
+  const rd = document.getElementById('gen-stamps-result');
+  if(rd){ rd.textContent=''; rd.style.background=''; rd.style.color=''; rd.style.padding=''; rd.style.fontWeight=''; }
+  const fc = document.getElementById('gen-stamps-force');
+  if(fc) fc.checked = false;
+  openModal('gen-stamps-modal');
+}
+function closeGenStampsModal(){
+  closeModal('gen-stamps-modal');
+}
+
+async function generateManagerStamps(){
+  const tplId   = (document.getElementById('gen-stamps-tpl-select')||{}).value || '';
+  const force   = (document.getElementById('gen-stamps-force')||{}).checked || false;
+  const resultDiv = document.getElementById('gen-stamps-result');
+  const btn     = document.getElementById('gen-stamps-btn');
+  if(!btn||!resultDiv) return;
+  btn.disabled = true;
+  resultDiv.style.background = 'transparent';
+  resultDiv.style.color = 'var(--text3)';
+  resultDiv.textContent = 'جارٍ التوليد…';
+  try{
+    const body = {};
+    if(tplId) body.template_id = parseInt(tplId);
+    if(force)  body.force = true;
+    const r   = await fetch('/api/admin/generate-manager-stamps',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const res = await r.json();
+    if(res.success){
+      if(res.generated > 0){
+        resultDiv.style.background = 'rgba(34,197,94,.12)';
+        resultDiv.style.color = '#22c55e';
+        resultDiv.style.padding = '10px 14px';
+        resultDiv.style.borderRadius = '8px';
+        resultDiv.style.fontWeight = '700';
+        resultDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> تم توليد <strong>${res.generated}</strong> ختم بنجاح` + (res.already_exists ? ` &nbsp;•&nbsp; موجودة مسبقاً: ${res.already_exists}` : '') + (res.failed ? ` &nbsp;•&nbsp; فشل: ${res.failed}` : '');
+        toast(`✔ تم توليد ${res.generated} ختم بنجاح`, 'success', 6000);
+      } else if(res.already_exists > 0){
+        resultDiv.style.background = 'rgba(234,179,8,.12)';
+        resultDiv.style.color = '#ca8a04';
+        resultDiv.style.padding = '10px 14px';
+        resultDiv.style.borderRadius = '8px';
+        resultDiv.style.fontWeight = '600';
+        resultDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> جميع الأختام (${res.already_exists}) موجودة مسبقاً<br><small style="font-weight:400">فعّل خيار "إعادة التوليد" أدناه لتحديثها بالقالب الحالي</small>`;
+        toast('الأختام موجودة مسبقاً — فعّل إعادة التوليد', 'warning', 6000);
+      } else {
+        resultDiv.textContent = res.message || 'تم';
+      }
+    } else {
+      resultDiv.style.background = 'rgba(239,68,68,.12)';
+      resultDiv.style.color = '#ef4444';
+      resultDiv.style.padding = '10px 14px';
+      resultDiv.style.borderRadius = '8px';
+      resultDiv.style.fontWeight = '600';
+      resultDiv.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${res.error || 'فشل التوليد'}`;
+      toast(res.error || 'فشل التوليد', 'error', 6000);
+    }
+  }catch(e){
+    resultDiv.style.background = 'rgba(239,68,68,.1)';
+    resultDiv.style.color = '#ef4444';
+    resultDiv.textContent = 'خطأ في الاتصال بالخادم';
+    toast('خطأ في الاتصال','error');
+  } finally{ btn.disabled = false; }
+}
+
+function escHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+document.getElementById('n-role').addEventListener('change', toggleNewStampField);
+applyRoleOptionsByActor();
+toggleNewStampField();
+loadAllData();
+setInterval(loadAllData, 30000);
+</script>
+{% endblock %}

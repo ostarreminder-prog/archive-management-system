@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة التحكم</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<style>
+:root {
+  --bg:#f4f3ee; --surface:#fbfaf6; --card:#fdfcf8; --border:#d2cbbf;
+  --accent:#a65a2a; --accent-g:rgba(166,90,42,.12);
+  --gold:#b7791f; --green:#2f855a; --red:#dc2626; --purple:#9a5b3f;
+  --text:#3a291d; --muted:#9a7358; --muted2:#6a4a34;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);direction:rtl;min-height:100vh;display:flex;}
+
+/* SIDEBAR */
+.sidebar{width:220px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;flex-shrink:0;}
+.sidebar-logo{padding:20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.s-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#8b451f);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.s-title{font-size:14px;font-weight:900;}
+.s-sub{font-size:10px;color:var(--muted);}
+nav{padding:12px 10px;flex:1;overflow-y:auto;}
+.nav-section{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;padding:0 8px;margin:14px 0 6px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted2);transition:all .2s;text-decoration:none;border:1px solid transparent;}
+.nav-item i{width:15px;text-align:center;flex-shrink:0;}
+.nav-item:hover{background:var(--card);color:var(--text);}
+.nav-item.active{background:var(--accent-g);border-color:rgba(166,90,42,.3);color:var(--accent);}
+.nav-badge{margin-right:auto;background:var(--red);color:#fff;border-radius:99px;font-size:10px;padding:1px 6px;font-weight:700;}
+.sidebar-user{padding:14px 16px;border-top:1px solid var(--border);}
+.user-row{display:flex;align-items:center;gap:9px;}
+.user-avatar{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#b7791f);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.user-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-role{font-size:10px;color:var(--muted);}
+.logout-btn{margin-top:8px;width:100%;background:none;border:1px solid var(--border);color:var(--muted2);border-radius:7px;padding:7px;font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer;transition:all .2s;}
+.logout-btn:hover{border-color:var(--red);color:var(--red);}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;}
+.topbar-title{font-size:18px;font-weight:900;}
+.topbar-sub{font-size:12px;color:var(--muted);margin-top:1px;}
+.topbar-right{display:flex;gap:10px;align-items:center;}
+.btn-primary{display:flex;align-items:center;gap:7px;padding:9px 18px;background:linear-gradient(135deg,var(--accent),#8b451f);border:none;border-radius:8px;color:#fff;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-decoration:none;}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(166,90,42,.28);}
+
+/* CONTENT */
+.content{padding:24px;flex:1;}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;position:relative;overflow:hidden;transition:border-color .2s;}
+.stat-card:hover{border-color:var(--stat-color,var(--accent));}
+.stat-card::before{content:'';position:absolute;top:0;right:0;width:50px;height:50px;background:var(--stat-color,var(--accent));border-radius:0 14px 0 50px;opacity:.08;}
+.stat-icon{font-size:24px;margin-bottom:10px;}
+.stat-value{font-size:28px;font-weight:900;color:var(--stat-color,var(--text));margin-bottom:2px;}
+.stat-label{font-size:12px;color:var(--muted2);}
+
+/* PENDING SIGNATURES */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.section-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.section-link{font-size:12px;color:var(--accent);text-decoration:none;font-weight:600;}
+.pending-focus{outline:2px solid rgba(166,90,42,.45);outline-offset:6px;border-radius:12px;box-shadow:0 0 0 4px rgba(166,90,42,.15);transition:all .25s;}
+.sign-request-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;transition:border-color .2s;}
+.sign-request-card:hover{border-color:rgba(166,90,42,.4);}
+.sign-doc-icon{font-size:24px;flex-shrink:0;}
+.sign-doc-info{flex:1;}
+.sign-doc-title{font-size:14px;font-weight:700;margin-bottom:3px;}
+.sign-doc-meta{font-size:12px;color:var(--muted2);}
+.sign-doc-archive{font-size:11px;color:var(--accent);font-weight:700;margin-top:2px;}
+.btn-sign{padding:8px 16px;background:linear-gradient(135deg,var(--green),#16a34a);border:none;border-radius:7px;color:#fff;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-sign:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(34,197,94,.3);}
+
+/* RECENT DOCS */
+.docs-table{width:100%;border-collapse:collapse;}
+.docs-table th{text-align:right;padding:10px 14px;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+.docs-table td{padding:12px 14px;font-size:13px;border-bottom:1px solid rgba(28,33,51,.5);vertical-align:middle;}
+.docs-table tr:last-child td{border-bottom:none;}
+.docs-table tr:hover td{background:var(--accent-g);}
+.status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;}
+.status-draft{background:rgba(77,90,122,.2);color:var(--muted2);border:1px solid rgba(77,90,122,.3);}
+.status-pending{background:rgba(240,180,41,.1);color:var(--gold);border:1px solid rgba(240,180,41,.3);}
+.status-approved{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3);}
+.status-rejected{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+
+/* SIGN MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(12,30,24,.22);backdrop-filter:blur(5px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+.modal-overlay.show{opacity:1;pointer-events:all;}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:100%;max-width:440px;transform:translateY(20px) scale(.97);transition:transform .25s;box-shadow:0 18px 34px rgba(22,44,36,.14);}
+.modal-overlay.show .modal{transform:translateY(0) scale(1);}
+.modal-title{font-size:18px;font-weight:900;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.modal-field{margin-bottom:14px;}
+.modal-field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px;}
+.modal-field input{width:100%;background:#ffffff;border:1.5px solid var(--border);border-radius:9px;padding:12px 14px;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;outline:none;direction:rtl;transition:border-color .2s;}
+.modal-field input:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
+.btn-cancel{padding:10px 20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--muted2);font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-confirm{padding:10px 22px;background:linear-gradient(135deg,var(--green),#16a34a);border:none;border-radius:8px;color:#fff;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+
+.result-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
+.result-qr{width:140px;height:140px;background:#fff;border-radius:10px;padding:8px;object-fit:contain;border:1px solid var(--border)}
+.result-serial{font-family:monospace;font-size:12px;color:var(--accent);word-break:break-all}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:fadeUp .35s ease both;}
+
+.dashboard-split{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+
+@media (max-width:980px){
+  body{display:block}
+  .sidebar{width:100%;height:auto;position:relative;border-left:none;border-bottom:1px solid var(--border)}
+  .sidebar-logo{padding:14px 12px}
+  nav{display:flex;gap:6px;overflow-x:auto;padding:10px 8px}
+  .nav-section{display:none}
+  .nav-item{white-space:nowrap;flex-shrink:0}
+  .sidebar-user{padding:10px 12px}
+  .main{min-height:auto}
+  .topbar{padding:12px;flex-wrap:wrap;gap:10px}
+  .topbar-right{width:100%}
+  .topbar-right .btn-primary{width:100%;justify-content:center}
+  .content{padding:12px}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+  .dashboard-split{grid-template-columns:1fr;gap:14px}
+  .docs-table{min-width:560px}
+  .dashboard-split > div:nth-child(2) > div:last-child{overflow-x:auto}
+  .modal-overlay{padding:10px;align-items:flex-end}
+  .modal{max-width:none;border-radius:14px;padding:18px}
+}
+
+@media (max-width:640px){
+  .stats-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="s-icon"><i class="fa-solid fa-star"></i></div>
+    <div>
+      <div class="s-title">الوثائق</div>
+      <div class="s-sub">نظام الإدارة</div>
+    </div>
+  </div>
+
+  <nav>
+    <div class="nav-section">الرئيسية</div>
+    <a href="/dashboard" class="nav-item active"><i class="fa-solid fa-chart-line"></i> لوحة التحكم</a>
+    <a href="/documents" class="nav-item"><i class="fa-solid fa-file-lines"></i> الوثائق</a>
+    {% if session.get('user_role') in ['admin','manager'] %}
+    <a href="/archive" class="nav-item"><i class="fa-solid fa-box-archive"></i> الأرشيف</a>
+    {% endif %}
+
+    <div class="nav-section">التوقيعات</div>
+    <a href="/dashboard?section=pending#pending-signatures" class="nav-item" onclick="focusPendingSigns(); return false;">
+      <i class="fa-solid fa-signature"></i> طلبات التوقيع
+      <span class="nav-badge" id="pending-badge" style="display:none">0</span>
+    </a>
+
+    {% if session.get('user_role') in ['admin','manager','sys_admin'] %}
+    <div class="nav-section">الإدارة</div>
+    <a href="/admin/panel" class="nav-item"><i class="fa-solid fa-shield-halved"></i> لوحة الأدمن</a>
+    {% if session.get('user_role') == 'admin' %}
+    <a href="/admin/users" class="nav-item"><i class="fa-solid fa-users"></i> المستخدمون</a>
+    <a href="/admin/logs" class="nav-item"><i class="fa-solid fa-clipboard-list"></i> سجل النشاط</a>
+    {% endif %}
+    {% endif %}
+
+    <div class="nav-section">الحساب</div>
+    <a href="/profile" class="nav-item"><i class="fa-solid fa-gear"></i> الملف الشخصي</a>
+  </nav>
+
+  <div class="sidebar-user">
+    <div class="user-row">
+      <div class="user-avatar">{{ session.get('user_name','?')[0] }}</div>
+      <div>
+        <div class="user-name">{{ session.get('user_name','—') }}</div>
+        <div class="user-role">{{ {'admin':'مدير عام','manager':'مدير','user':'موظف'}.get(session.get('user_role',''),'—') }}</div>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="window.location='/logout'">تسجيل الخروج</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">لوحة التحكم</div>
+      <div class="topbar-sub" id="date-display"></div>
+    </div>
+    <div class="topbar-right">
+      <a href="/documents" class="btn-primary"><i class="fa-solid fa-plus"></i> وثيقة جديدة</a>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- STATS -->
+    <div class="stats-grid anim">
+      <div class="stat-card" style="--stat-color:#a65a2a">
+        <div class="stat-icon"><i class="fa-solid fa-file-lines"></i></div>
+        <div class="stat-value" id="stat-total">{{ stats.total_docs }}</div>
+        <div class="stat-label">إجمالي الوثائق</div>
+      </div>
+      <div class="stat-card" style="--stat-color:#f0b429">
+        <div class="stat-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+        <div class="stat-value" id="stat-pending">{{ stats.pending_signs }}</div>
+        <div class="stat-label">بانتظار توقيعك</div>
+      </div>
+      <div class="stat-card" style="--stat-color:#22c55e">
+        <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="stat-value" id="stat-approved">{{ stats.approved }}</div>
+        <div class="stat-label">معتمدة</div>
+      </div>
+      <div class="stat-card" style="--stat-color:#a855f7">
+        <div class="stat-icon"><i class="fa-solid fa-file-pen"></i></div>
+        <div class="stat-value" id="stat-mine">{{ stats.my_docs }}</div>
+        <div class="stat-label">وثائقي</div>
+      </div>
+    </div>
+
+    <!-- PENDING SIGNATURES -->
+    <div class="dashboard-split">
+
+      <div id="pending-signatures">
+        <div class="section-header">
+          <div class="section-title"><i class="fa-solid fa-signature"></i> طلبات التوقيع المعلقة</div>
+          <span class="section-link" style="cursor:pointer" onclick="loadPendingSigns()">تحديث</span>
+        </div>
+        <div id="pending-signs-list">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">جارٍ التحميل...</div>
+        </div>
+      </div>
+
+      <!-- RECENT DOCS -->
+      <div>
+        <div class="section-header">
+          <div class="section-title"><i class="fa-solid fa-file-lines"></i> آخر الوثائق</div>
+          <a href="/documents" class="section-link">عرض الكل</a>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+          <table class="docs-table">
+            <thead>
+              <tr>
+                <th>رقم الأرشيف</th>
+                <th>العنوان</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="recent-docs-tbody">
+              <tr><td colspan="3" style="text-align:center;color:var(--muted);padding:24px">جارٍ التحميل...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<!-- Sign Modal -->
+<div class="modal-overlay" id="sign-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-signature"></i> تأكيد التوقيع</div>
+    <div id="sign-modal-doc" style="background:#0a0c12;border-radius:9px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--muted2);">—</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">
+      <i class="fa-solid fa-triangle-exclamation"></i> بعد التوقيع سيُصدر رقم تسلسلي ويُسجل توقيعك بشكل دائم
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSignModal()">إلغاء</button>
+      <button class="btn-confirm" onclick="confirmSign()"><i class="fa-solid fa-check"></i> توقيع الآن</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="result-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-circle-check"></i> تم التوقيع بنجاح</div>
+    <div class="result-wrap">
+      <div style="font-size:12px;color:var(--muted2)">باركود التحقق:</div>
+      <img id="result-qr" class="result-qr" alt="QR">
+      <div style="font-size:11px;color:var(--muted)">الرقم التسلسلي:</div>
+      <div id="result-serial" class="result-serial">—</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeResultModal()">إغلاق</button>
+      <button class="btn-confirm" onclick="openVerifyPage()">فتح صفحة التحقق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentSignReqId = null;
+let currentVerifySerial = null;
+
+async function readJsonSafe(res) {
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    return await res.json();
+  }
+  const raw = await res.text();
+  const msg = raw && !raw.startsWith('<!DOCTYPE') ? raw.slice(0, 180) : 'استجابة غير متوقعة من الخادم';
+  throw new Error(msg);
+}
+
+// التاريخ
+document.getElementById('date-display').textContent =
+  new Date().toLocaleDateString('ar-SA', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// تحميل طلبات التوقيع
+async function loadPendingSigns() {
+  const el = document.getElementById('pending-signs-list');
+  try {
+    const res = await fetch('/api/my-pending-signatures', {headers:{'Accept':'application/json'}});
+    const data = await readJsonSafe(res);
+    if (!res.ok) throw new Error(data.error || 'تعذر تحميل طلبات التوقيع');
+
+    const badge = document.getElementById('pending-badge');
+    if (data.length > 0) {
+      badge.textContent = data.length;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if (!data.length) {
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px"><i class="fa-solid fa-circle-check"></i> لا توجد طلبات معلقة</div>';
+      return;
+    }
+
+    el.innerHTML = data.map(r => {
+      const docTitle = r.title || r.doc_title || 'بدون عنوان';
+      const archive = r.archive_number || '—';
+      return `
+      <div class="sign-request-card">
+        <div class="sign-doc-icon"><i class="fa-solid fa-file-lines"></i></div>
+        <div class="sign-doc-info">
+          <div class="sign-doc-title">${docTitle}</div>
+          <div class="sign-doc-archive">${archive}</div>
+          <div class="sign-doc-meta"><i class="fa-solid fa-bell"></i> ${r.requester_name || 'أحد الموظفين'} أرسل لك مستندًا للتوقيع — ${r.serial_number || '—'}</div>
+        </div>
+        <button class="btn-sign" onclick='openSignModal(${Number(r.id)}, ${JSON.stringify(docTitle)}, ${JSON.stringify(archive)})'>
+          <i class="fa-solid fa-signature"></i> وقّع الآن
+        </button>
+      </div>
+    `;
+    }).join('');
+  } catch (err) {
+    el.innerHTML = `<div style="text-align:center;padding:30px;color:#ef4444;font-size:13px"><i class="fa-solid fa-circle-xmark"></i> ${err.message}</div>`;
+  }
+}
+
+function focusPendingSigns(){
+  loadPendingSigns();
+  const sec = document.getElementById('pending-signatures');
+  if(!sec) return;
+  sec.scrollIntoView({behavior:'smooth', block:'start'});
+  sec.classList.add('pending-focus');
+  setTimeout(()=>sec.classList.remove('pending-focus'), 1400);
+}
+
+// تحميل الوثائق الأخيرة
+async function loadRecentDocs() {
+  const tbody = document.getElementById('recent-docs-tbody');
+  try {
+    const res = await fetch('/api/documents', {headers:{'Accept':'application/json'}});
+    const data = await readJsonSafe(res);
+    if (!res.ok) throw new Error(data.error || 'تعذر تحميل الوثائق');
+
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">لا توجد وثائق</td></tr>';
+      return;
+    }
+
+    const statusMap = {
+      draft:    ['مسودة', 'status-draft'],
+      pending:  ['معلقة', 'status-pending'],
+      approved: ['معتمدة','status-approved'],
+      rejected: ['مرفوضة','status-rejected'],
+    };
+
+    tbody.innerHTML = data.slice(0,8).map(d => {
+      const [label, cls] = statusMap[d.status] || ['—','status-draft'];
+      return `
+        <tr>
+          <td style="font-size:11px;color:var(--accent);font-weight:700">${d.archive_number||'—'}</td>
+          <td>${d.title}</td>
+          <td><span class="status-badge ${cls}">${label}</span></td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#ef4444;padding:20px"><i class="fa-solid fa-circle-xmark"></i> ${err.message}</td></tr>`;
+  }
+}
+
+// توقيع
+function openSignModal(reqId, title, archive) {
+  currentSignReqId = reqId;
+  document.getElementById('sign-modal-doc').innerHTML =
+    `<strong>${title}</strong><br><span style="color:var(--accent)">${archive}</span>`;
+  document.getElementById('sign-modal').classList.add('show');
+}
+
+function closeSignModal() {
+  document.getElementById('sign-modal').classList.remove('show');
+  currentSignReqId = null;
+}
+
+function showResultModal(serial) {
+  currentVerifySerial = serial;
+  document.getElementById('result-serial').textContent = serial || '—';
+  const qr = document.getElementById('result-qr');
+  qr.src = `/api/qr/${encodeURIComponent(serial || '')}`;
+  document.getElementById('result-modal').classList.add('show');
+}
+
+function closeResultModal() {
+  document.getElementById('result-modal').classList.remove('show');
+}
+
+function openVerifyPage() {
+  if (!currentVerifySerial) return;
+  window.open(`/verify/${encodeURIComponent(currentVerifySerial)}`, '_blank');
+}
+
+async function confirmSign() {
+  if (!currentSignReqId) return;
+
+  const res = await fetch(`/api/signature-request/${currentSignReqId}/sign`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+    body: JSON.stringify({})
+  });
+
+  const data = await readJsonSafe(res);
+  closeSignModal();
+
+  if (res.ok && data.success) {
+    const ref = data.serial || data.sign_hash || '—';
+    showResultModal(ref);
+    loadPendingSigns();
+    loadRecentDocs();
+  } else {
+    alert(`${data.error || 'فشل التوقيع'}`);
+  }
+}
+
+// إغلاق الـ modal بالضغط على الخلفية
+document.getElementById('sign-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSignModal();
+});
+document.getElementById('result-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeResultModal();
+});
+
+// تحميل البيانات
+loadPendingSigns();
+loadRecentDocs();
+
+const sp = new URLSearchParams(window.location.search);
+if (window.location.hash === '#pending-signatures' || sp.get('section') === 'pending') {
+  setTimeout(() => focusPendingSigns(), 120);
+}
+
+window.focusPendingSigns = focusPendingSigns;
+</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>نجم — التحقق من الوثيقة</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<style>
+:root{--bg:#f4f3ee;--card:#fdfcf8;--border:#d2cbbf;--border2:#d2cbbf;--accent:#a65a2a;--gold:#b7791f;--green:#2f855a;--red:#dc2626;--text:#3a291d;--text2:#6a4a34;--text3:#9a7358}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl}
+.wrap{width:100%;max-width:520px}
+.logo{text-align:center;margin-bottom:28px}
+.logo-star{width:52px;height:52px;background:linear-gradient(135deg,var(--gold),#f59e0b);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 10px}
+.logo h1{font-size:22px;font-weight:700;color:var(--text)}
+.logo p{font-size:12px;color:var(--text3);margin-top:2px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 18px 34px rgba(22,44,36,.12)}
+.status-bar{padding:20px 24px;text-align:center;border-bottom:1px solid var(--border)}
+.status-icon{font-size:48px;margin-bottom:10px}
+.status-title{font-size:20px;font-weight:700;margin-bottom:4px}
+.status-sub{font-size:13px;opacity:.8}
+.body{padding:22px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(26,30,42,.6)}
+.row:last-child{border-bottom:none}
+.row-label{font-size:11px;color:var(--text3);font-weight:600;flex-shrink:0;margin-left:16px}
+.row-val{font-size:13px;font-weight:600;text-align:left;word-break:break-all;direction:ltr}
+.hash-val{font-family:monospace;font-size:10px;color:var(--accent)}
+.signers{margin-top:4px}
+.signer-item{display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,.02);border-radius:8px;margin-bottom:6px}
+.s-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#b7791f);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.s-name{font-size:13px;font-weight:600;margin-bottom:1px}
+.s-meta{font-size:10px;color:var(--text3);direction:ltr}
+.footer{padding:16px 24px;border-top:1px solid var(--border);text-align:center;font-size:11px;color:var(--text3)}
+.footer a{color:var(--accent);text-decoration:none;font-weight:600}
+.search-card{background:linear-gradient(180deg,#fffdf9,#fff6ee);border:1px solid var(--border);border-radius:20px;padding:18px 18px 16px;margin-bottom:14px;box-shadow:0 12px 26px rgba(92,55,28,.12)}
+.search-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.search-title{font-size:15px;font-weight:700}
+.search-sub{font-size:12px;color:var(--text3);line-height:1.7}
+.search-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(166,90,42,.1);border:1px solid rgba(166,90,42,.22);font-size:11px;color:var(--accent);font-weight:700;white-space:nowrap}
+.search-form{display:flex;gap:10px;align-items:stretch}
+.search-input{flex:1;background:#ffffff;border:1px solid var(--border2);border-radius:14px;padding:14px 16px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:14px;outline:none;direction:ltr}
+.search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(166,90,42,.14)}
+.search-btn{background:linear-gradient(135deg,var(--accent),#8b451f);color:#fff;border:none;border-radius:14px;padding:0 18px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;font-weight:700;cursor:pointer;min-width:124px}
+.search-hint{margin-top:10px;font-size:11px;color:var(--text3)}
+.empty-state{padding:18px 6px 4px;text-align:center;color:var(--text2)}
+.empty-state i{font-size:24px;color:var(--gold);margin-bottom:10px;display:block}
+.empty-state strong{display:block;font-size:14px;color:var(--text);margin-bottom:6px}
+/* العمليات */
+.ops-section{margin-top:4px}
+.ops-title{font-size:11px;color:var(--text3);font-weight:600;margin-bottom:10px}
+.op-timeline{position:relative;padding-right:18px}
+.op-timeline::before{content:'';position:absolute;right:6px;top:4px;bottom:4px;width:2px;background:var(--border)}
+.op-item{position:relative;margin-bottom:12px;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid var(--border)}
+.op-item::before{content:'';position:absolute;right:-13px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.op-action{font-size:12px;font-weight:700;color:var(--text)}
+.op-meta{font-size:10px;color:var(--text3);margin-top:2px;direction:ltr;text-align:right}
+/* الحالات */
+.approved .status-bar{background:linear-gradient(135deg,rgba(5,95,70,.3),rgba(5,150,105,.1))}
+.approved .status-title{color:var(--green)}
+.rejected .status-bar{background:linear-gradient(135deg,rgba(120,0,0,.3),rgba(180,0,0,.1))}
+.rejected .status-title{color:var(--red)}
+.pending .status-bar{background:linear-gradient(135deg,rgba(90,70,0,.3),rgba(140,100,0,.1))}
+.pending .status-title{color:var(--gold)}
+@media (max-width:640px){
+  .search-head{flex-direction:column;align-items:flex-start}
+  .search-form{flex-direction:column}
+  .search-btn{min-height:48px;width:100%}
+  .wrap{max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <div class="logo-star"><i class="fa-solid fa-star"></i></div>
+    <h1>نجم</h1>
+    <p>التحقق من صحة الوثيقة</p>
+  </div>
+
+  <div class="search-card">
+    <div class="search-head">
+      <div>
+        <div class="search-title">البحث بالسيريال نمبر</div>
+        <div class="search-sub">أدخل الرقم التسلسلي للتحقق من أي مستند ومعرفة حالة اعتماده وبياناته.</div>
+      </div>
+      <div class="search-badge"><i class="fa-solid fa-shield-halved"></i> تحقق مباشر</div>
+    </div>
+    <form class="search-form" method="get" action="/verify">
+      <input class="search-input" type="text" name="serial" value="{{ serial or '' }}" placeholder="مثال: SIG-2026-000123" autocomplete="off" spellcheck="false">
+      <button class="search-btn" type="submit"><i class="fa-solid fa-magnifying-glass"></i> بحث</button>
+    </form>
+    <div class="search-hint">يمكنك لصق الرقم مباشرة كما هو مكتوب على التوقيع أو الختم أو من رابط الـ QR.</div>
+  </div>
+
+  {% if doc %}
+  <div class="card {{ doc.status }}">
+    <div class="status-bar">
+      {% if doc.status == 'approved' %}
+        <div class="status-icon"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="status-title">وثيقة معتمدة</div>
+        <div class="status-sub">هذه الوثيقة صحيحة ومعتمدة رسمياً</div>
+      {% elif doc.status == 'rejected' %}
+        <div class="status-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+        <div class="status-title">وثيقة مرفوضة</div>
+        <div class="status-sub">هذه الوثيقة غير معتمدة</div>
+      {% else %}
+        <div class="status-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+        <div class="status-title">بانتظار الاعتماد</div>
+        <div class="status-sub">الوثيقة موقعة لكن لم تُعتمد بعد</div>
+      {% endif %}
+    </div>
+    <div class="body">
+      <div class="row">
+        <span class="row-label">عنوان الوثيقة</span>
+        <span class="row-val" style="direction:rtl">{{ doc.title }}</span>
+      </div>
+      <div class="row">
+        <span class="row-label">رقم الأرشيف</span>
+        <span class="row-val">{{ doc.archive_number or '—' }}</span>
+      </div>
+      <div class="row">
+        <span class="row-label">الرقم التسلسلي</span>
+        <span class="row-val">{{ serial }}</span>
+      </div>
+      <div class="row">
+        <span class="row-label">تاريخ الإنشاء</span>
+        <span class="row-val">{{ (doc.created_at or '')[:16] }}</span>
+      </div>
+      {% if doc.approved_at %}
+      <div class="row">
+        <span class="row-label">تاريخ الاعتماد</span>
+        <span class="row-val">{{ doc.approved_at[:16] }}</span>
+      </div>
+      {% endif %}
+      <div class="row">
+        <span class="row-label">Hash التحقق</span>
+        <span class="row-val hash-val">{{ sign_hash or '—' }}</span>
+      </div>
+      {% if signers %}
+      <div class="row" style="flex-direction:column;align-items:flex-start">
+        <span class="row-label" style="margin-bottom:10px">الموقعون</span>
+        <div class="signers" style="width:100%">
+          {% for s in signers %}
+          <div class="signer-item">
+            <div class="s-av">{{ s.name[0] }}</div>
+            <div>
+              <div class="s-name">{{ s.name }}</div>
+              <div class="s-meta">{{ s.serial_number }} • {{ (s.signed_at or '')[:16] }}</div>
+            </div>
+            <div style="margin-right:auto">
+              <span style="font-size:10px;color:var(--green)"><i class="fa-solid fa-circle-check"></i> موقع</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if stamp_creator %}
+      <div class="row" style="flex-direction:column;align-items:flex-start">
+        <span class="row-label" style="margin-bottom:10px"><i class="fa-solid fa-stamp" style="margin-left:5px"></i>منشيء الكليشة</span>
+        <div class="signers" style="width:100%">
+          <div class="signer-item">
+            <div class="s-av" style="background:linear-gradient(135deg,#e8a830,#f59e0b)">{{ stamp_creator.name[0] if stamp_creator.name else '—' }}</div>
+            <div>
+              <div class="s-name">{{ stamp_creator.name or '—' }}</div>
+              <div class="s-meta">
+                {{ stamp_creator.job_title or stamp_creator.role or '—' }}
+                {% if stamp_creator.created_at %} • {{ (stamp_creator.created_at or '')[:16] }}{% endif %}
+              </div>
+            </div>
+            <div style="margin-right:auto">
+              <span style="font-size:10px;color:var(--gold)"><i class="fa-solid fa-seal"></i> ختم</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% if operations %}
+    <div class="body" style="border-top:1px solid var(--border);padding-top:16px">
+      <div class="ops-title"><i class="fa-solid fa-clock-rotate-left" style="margin-left:5px"></i>سجل العمليات</div>
+      <div class="op-timeline">
+        {% set action_labels = {
+          'CREATE_DOCUMENT': 'إنشاء الوثيقة',
+          'EDIT_DOCUMENT': 'تعديل الوثيقة',
+          'ARCHIVE_DOCUMENT': 'أرشفة الوثيقة',
+          'APPROVE_DOCUMENT': 'اعتماد الوثيقة',
+          'REJECT_DOCUMENT': 'رفض الوثيقة',
+          'CONVERT_PDF': 'تحويل إلى PDF',
+          'SIGNED': 'توقيع الوثيقة',
+          'SIGNED_PDF': 'توقيع PDF',
+          'REQUEST_SIGN': 'طلب توقيع'
+        } %}
+        {% for op in operations %}
+        <div class="op-item">
+          <div class="op-action">{{ action_labels.get(op.action, op.action) }}</div>
+          <div class="op-meta">
+            {{ op.user_name or '—' }}
+            {% if op.timestamp %} • {{ op.timestamp[:16] }}{% endif %}
+            {% if op.ip_address %} • {{ op.ip_address }}{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="footer">
+      تم التحقق عبر نظام <a href="/">نجم</a> — {{ now }}
+    </div>
+  </div>
+  {% elif lookup_performed %}
+  <div class="card">
+    <div class="status-bar" style="background:rgba(100,0,0,.2)">
+      <div class="status-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="status-title" style="color:var(--red)">رقم غير موجود</div>
+      <div class="status-sub">هذا الرقم التسلسلي غير مسجل في النظام</div>
+    </div>
+    <div class="body">
+      <div class="row">
+        <span class="row-label">الرقم الذي تم البحث عنه</span>
+        <span class="row-val">{{ serial or '—' }}</span>
+      </div>
+    </div>
+    <div class="footer">
+      <a href="/">العودة لنجم</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="card">
+    <div class="body empty-state">
+      <i class="fa-solid fa-fingerprint"></i>
+      <strong>ابدأ التحقق برقم السيريال</strong>
+      <div>أدخل الرقم في الحقل بالأعلى وسيعرض النظام بيانات المستند وسجل التحقق فورًا.</div>
+    </div>
+    <div class="footer">
+      <a href="/">العودة لنجم</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+<input type="hidden" id="qr-input" autocomplete="off" spellcheck="false" style="position:absolute;left:-9999px;opacity:0">
+<script>
+// قارئ الباركود (QR Scanner)
+// عند مسح أي باركود، يتم استخراج الرقم التسلسلي وتوجيه المستخدم لصفحة التحقق
+(function(){
+  const qrInput = document.getElementById('qr-input');
+  const searchInput = document.querySelector('.search-input');
+  const searchForm = document.querySelector('.search-form');
+  
+  if (!qrInput) return;
+  
+  // إعطاء التركيز للحقل المخفي ليستقبل بيانات الباركود
+  qrInput.focus();
+  
+  // استقبال بيانات الباركود من الماسح الضوئي
+  qrInput.addEventListener('change', function(e) {
+    const qrData = e.target.value.trim();
+    if (!qrData) return;
+    
+    // استخراج الرقم التسلصلي من بيانات QR
+    // الباركود قد يكون في صيغ مختلفة:
+    // - رقم مباشر: SIG-2026-000123
+    // - رابط: https://example.com/verify/SIG-2026-000123
+    // - نص عام: يحتوي على الرقم
+    
+    let serialNumber = null;
+    
+    // البحث عن نمط السيريال (SIG-xxxx-xxxxx أو رقم أخر)
+    const patterns = [
+      /[A-Z]+-\d{4}-\d{6}/,  // SIG-2026-000123
+      /[A-Z]+-\d{4}-\d{5}/,  // SIG-2026-00123
+      /[A-Z]+-\d{4}-\d{4}/,  // SIG-2026-0123
+      /\d{4}[A-Z]{2}\d{4}/,  // 2026GN0123
+      /[A-Z]{2}\d{6}/        // GN000123
+    ];
+    
+    for (const pattern of patterns) {
+      const match = qrData.match(pattern);
+      if (match) {
+        serialNumber = match[0];
+        break;
+      }
+    }
+    
+    // إذا لم نجد نمط معروف، جرب استخراج أي رقم/نص قد يكون الرقم
+    if (!serialNumber && qrData.length > 3) {
+      // حاول استخراج آخر جزء من الرابط إن كان رابط
+      if (qrData.includes('/')) {
+        const parts = qrData.split('/');
+        const lastPart = parts[parts.length - 1].trim().toUpperCase();
+        if (lastPart.length > 3) serialNumber = lastPart;
+      } else {
+        serialNumber = qrData.toUpperCase();
+      }
+    }
+    
+    if (serialNumber) {
+      // تحويل المستخدم لصفحة التحقق
+      window.location.href = '/verify/' + encodeURIComponent(serialNumber);
+    }
+    
+    qrInput.value = '';
+    qrInput.focus();
+  });
+  
+  // إذا كان هناك حقل البحث، أضف الرقم وأرسل الفورم
+  qrInput.addEventListener('input', function(e) {
+    const qrData = e.target.value.trim();
+    
+    if (qrData && (qrData.includes('-') || qrData.length > 6)) {
+      // معالجة مشابهة للـ 'change' event
+      const event = new Event('change', { bubbles: true });
+      qrInput.dispatchEvent(event);
+    }
+  });
+  
+  // السماح برفع التركيز من مجال البحث إلى الحقل المخفي
+  if (searchInput) {
+    searchInput.addEventListener('focus', function() {
+      // إذا كان هناك بيانات مسحوضة من ماسح، نقلها للبحث
+    });
+  }
+  
+  // استمع لأي مفاتيح عامة قد تكون من ماسح QR (يبدأ بـ Enter وينتهي بـ Enter)
+  let qrBuffer = '';
+  let qrTimeout;
+  
+  document.addEventListener('keypress', function(e) {
+    // إذا كان المستخدم يكتب في حقل الإدخال العادي، تجاهل
+    if (document.activeElement !== document.body && document.activeElement !== qrInput) {
+      return;
+    }
+    
+    // جمع البيانات من الماسح (عادة تأتي بسرعة كحزمة واحدة)
+    qrBuffer += e.key;
+    
+    clearTimeout(qrTimeout);
+    qrTimeout = setTimeout(function() {
+      if (qrBuffer.length > 4) {
+        qrInput.value = qrBuffer.trim();
+        qrInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      qrBuffer = '';
+    }, 100);
+  });
+})();
+</script>
+</body>
+</html>

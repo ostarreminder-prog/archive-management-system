@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+{% block title %}إدارة القوالب{% endblock %}
+{% block page_title %}إدارة القوالب{% endblock %}
+{% block page_sub %}عرض القوالب، المعاينة، التعيين الافتراضي، الإضافة، التعديل، الحذف{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openModal('upload-template-modal')"><i class="fa-solid fa-file-circle-plus"></i> إضافة قالب</button>
+<button class="btn-ghost" onclick="loadTemplates()"><i class="fa-solid fa-rotate"></i> تحديث</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.tpl-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.tpl-toolbar input{flex:1;min-width:220px;background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;outline:none}
+.tpl-toolbar input:focus{border-color:var(--accent)}
+.tpl-default-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:700}
+.tpl-pdf-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700}
+.tpl-preview-wrap{max-height:60vh;overflow:auto;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px}
+.tpl-preview-images{display:grid;gap:8px;margin-bottom:8px}
+.tpl-preview-images img{width:100%;max-height:220px;object-fit:contain;background:#fff;border:1px solid var(--border);border-radius:8px}
+.tpl-preview-lines{background:#fff;border:1px dashed #e5e7eb;border-radius:8px;padding:10px;display:grid;gap:6px}
+.tpl-preview-lines div{font-size:12px;color:#000;line-height:1.7}
+.tpl-file-hint{font-size:11px;color:var(--text3);margin-top:6px}
+.tpl-preview-modal .modal{width:min(94vw,1180px);max-width:1180px;max-height:90vh;padding:24px 28px;display:flex;flex-direction:column;overflow:hidden}
+.tpl-preview-modal .tpl-preview-wrap{flex:1;min-height:62vh;max-height:none;padding:16px;overflow:auto}
+.tpl-preview-modal .tpl-preview-images{gap:12px;margin-bottom:12px}
+.tpl-preview-modal .tpl-preview-images img{max-height:420px}
+.tpl-preview-modal .tpl-preview-lines{padding:14px;gap:8px}
+.tpl-preview-modal .tpl-preview-lines div{font-size:13px;line-height:1.9}
+
+/* PDF position editor */
+.pdf-pos-editor{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.pdf-page-canvas-wrap{position:relative;flex:0 0 auto;border:2px solid var(--border2);border-radius:8px;overflow:hidden;cursor:crosshair;user-select:none}
+.pdf-page-canvas-wrap img{display:block;max-height:70vh;width:auto}
+.pdf-marker{position:absolute;pointer-events:none;}
+.pdf-marker-dot{width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px currentColor;transform:translate(-50%,-50%);position:absolute}
+.pdf-marker-label{position:absolute;font-size:10px;font-weight:700;white-space:nowrap;transform:translate(-50%,6px);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);top:0;left:0}
+.pdf-pos-fields{flex:1;min-width:260px;display:grid;gap:14px}
+.pdf-pos-group{background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px}
+.pdf-pos-group h4{margin:0 0 10px;font-size:12px;font-weight:700;color:var(--text2)}
+.pdf-pos-group label{font-size:11px;color:var(--text3);display:block;margin-bottom:2px}
+.pdf-pos-group input[type=number]{width:100%;background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:6px 8px;color:var(--text);font-size:12px;outline:none}
+.pdf-pos-group .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:900px){
+  .tpl-preview-modal .modal{width:96vw;max-height:92vh;padding:18px}
+  .pdf-pos-editor{flex-direction:column}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tpl-toolbar">
+  <input id="tpl-search" placeholder="بحث باسم القالب..." oninput="renderTemplates()">
+</div>
+
+<div class="table-wrap">
+  <div class="table-head">
+    <div class="table-title"><i class="fa-solid fa-file-word"></i> قائمة القوالب</div>
+    <div id="templates-count" style="font-size:11px;color:var(--text3)">—</div>
+  </div>
+  <div id="templates-table">
+    <div class="empty">
+      <div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+      <div class="empty-text">جارٍ التحميل...</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="upload-template-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title"><i class="fa-solid fa-file-circle-plus"></i> إضافة قالب جديد</div>
+    <div class="mfield">
+      <label>ملف القالب (DOCX أو PDF كليشة)</label>
+      <input type="file" id="tpl-upload-input" accept=".docx,.pdf">
+      <div class="tpl-file-hint">DOCX: قالب نصي بـ Word. PDF: كليشة رسمية بمواضع محددة للبيانات والباركود.</div>
+    </div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('upload-template-modal')">إلغاء</button>
+      <button class="btn-primary" id="tpl-upload-btn" onclick="uploadTemplate()">رفع القالب</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rename-template-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title"><i class="fa-solid fa-pen"></i> تعديل اسم القالب</div>
+    <input type="hidden" id="rename-old-name">
+    <div class="mfield">
+      <label>الاسم الحالي</label>
+      <input type="text" id="rename-old-name-view" readonly>
+    </div>
+    <div class="mfield">
+      <label>الاسم الجديد</label>
+      <input type="text" id="rename-new-name" placeholder="new-template.docx">
+    </div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('rename-template-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveRenameTemplate()">حفظ التعديل</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF Position Editor Modal -->
+<div class="modal-overlay tpl-preview-modal" id="pdf-positions-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-map-pin"></i> ضبط مواضع البيانات — <span id="pdf-pos-tpl-name" style="font-size:13px;color:var(--text3)"></span></div>
+    <p style="font-size:11px;color:var(--text3);margin:0 0 12px">انقر على الصورة لتحديد موضع أي عنصر، أو اكتب النسبة يدوياً (0.0 = اليسار/الأعلى، 1.0 = اليمين/الأسفل).</p>
+    <div class="tpl-preview-wrap" style="overflow:auto">
+      <div class="pdf-pos-editor">
+        <div class="pdf-page-canvas-wrap" id="pdf-pos-canvas-wrap">
+          <img id="pdf-pos-page-img" src="" alt="صفحة القالب" style="max-height:70vh;width:auto">
+          <!-- markers injected by JS -->
+        </div>
+        <div class="pdf-pos-fields" id="pdf-pos-fields">
+          <!-- fields injected by JS -->
+        </div>
+      </div>
+    </div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('pdf-positions-modal')">إلغاء</button>
+      <button class="btn-primary" id="pdf-pos-save-btn" onclick="savePdfPositions()"><i class="fa-solid fa-floppy-disk"></i> حفظ المواضع</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay tpl-preview-modal" id="preview-template-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-eye"></i> معاينة القالب</div>
+    <div id="preview-template-title" style="font-size:12px;color:var(--text2);margin-bottom:10px">—</div>
+    <div id="preview-template-body" class="tpl-preview-wrap">جارٍ التحميل...</div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('preview-template-modal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let templatesData = [];
+let defaultTemplateName = '';
+
+// ── active PDF position editing state ──────────────────────────────────────
+let _pdfPosTplName = '';
+let _pdfPosConfig   = {};
+let _pdfPosActive   = null;   // which field the user clicked to place
+const _PDF_POS_FIELDS = [
+  { key: 'archive_number', label: 'رقم الأرشيف', color: '#a65a2a',
+    fields: [
+      {f:'x', label:'الموضع الأفقي (X)', min:0, max:1, step:0.01},
+      {f:'y', label:'الموضع الرأسي (Y)', min:0, max:1, step:0.01},
+      {f:'font_size', label:'حجم الخط', min:6, max:24, step:1},
+    ]},
+  { key: 'date', label: 'التاريخ والوقت', color: '#16a34a',
+    fields: [
+      {f:'x', label:'الموضع الأفقي (X)', min:0, max:1, step:0.01},
+      {f:'y', label:'الموضع الرأسي (Y)', min:0, max:1, step:0.01},
+      {f:'font_size', label:'حجم الخط', min:6, max:24, step:1},
+    ]},
+  { key: 'content', label: 'منطقة النص', color: '#b7791f',
+    fields: [
+      {f:'x_right',  label:'X (يمين)',    min:0, max:1, step:0.01},
+      {f:'y_start',  label:'Y البداية',   min:0, max:1, step:0.01},
+      {f:'y_end',    label:'Y النهاية',   min:0, max:1, step:0.01},
+      {f:'font_size',label:'حجم الخط',    min:8, max:24, step:1},
+      {f:'line_height',label:'ارتفاع السطر (pt)', min:10, max:40, step:1},
+    ]},
+  { key: 'qr', label: 'الباركود (QR)', color: '#b45309',
+    fields: [
+      {f:'x',    label:'الموضع الأفقي (X)', min:0, max:1, step:0.01},
+      {f:'y',    label:'الموضع الرأسي (Y)', min:0, max:1, step:0.01},
+      {f:'size', label:'الحجم (نسبة العرض)', min:0.04, max:0.3, step:0.01},
+    ]},
+];
+
+function esc(value=''){
+  return String(value)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+async function readJson(res){
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || 'تعذر تحميل البيانات');
+  return data;
+}
+
+async function loadTemplates(){
+  const table = document.getElementById('templates-table');
+  if(table) table.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div>';
+  try {
+    const data = await fetch('/api/admin/docx-templates').then(readJson);
+    templatesData = Array.isArray(data.templates) ? data.templates : [];
+    defaultTemplateName = String(data.default_template || '').trim();
+    renderTemplates();
+  } catch(err) {
+    if(table) table.innerHTML = `<div class="empty"><div class="empty-icon"><i class="fa-solid fa-circle-xmark"></i></div><div class="empty-text" style="color:var(--red)">${esc(err.message)}</div></div>`;
+  }
+}
+
+function renderTemplates(){
+  const q = (document.getElementById('tpl-search')?.value || '').toLowerCase().trim();
+  const rows = templatesData.filter(item => String(item.file_name||'').toLowerCase().includes(q));
+
+  const countEl = document.getElementById('templates-count');
+  if(countEl) countEl.textContent = `${rows.length} قالب`;
+
+  const table = document.getElementById('templates-table');
+  if(!table) return;
+
+  if(!rows.length){
+    table.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fa-solid fa-file-circle-xmark"></i></div><div class="empty-text">لا توجد قوالب</div></div>';
+    return;
+  }
+
+  table.innerHTML = `<table>
+    <thead><tr><th>اسم القالب</th><th>النوع</th><th>الحجم</th><th>آخر تعديل</th><th>الحالة</th><th></th></tr></thead>
+    <tbody>${rows.map(item => {
+      const fn = String(item.file_name||'');
+      const ft = String(item.file_type||'docx');
+      const isDefault = fn === defaultTemplateName;
+      const isPdf = ft === 'pdf';
+      return `<tr>
+        <td style="direction:ltr;font-size:12px;font-weight:700">${esc(fn)}</td>
+        <td>${isPdf
+          ? '<span class="tpl-pdf-pill"><i class="fa-solid fa-file-pdf"></i> PDF كليشة</span>'
+          : '<span style="font-size:11px;color:var(--text3)"><i class="fa-solid fa-file-word"></i> DOCX</span>'}</td>
+        <td style="font-size:12px;color:var(--text2)">${Number(item.size_kb||0)} KB</td>
+        <td style="font-size:11px;color:var(--text3)">${esc(item.updated_at||'—')}</td>
+        <td>${isDefault ? '<span class="tpl-default-pill"><i class="fa-solid fa-star"></i> افتراضي</span>' : '<span class="badge badge-draft">غير افتراضي</span>'}</td>
+        <td>
+          <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
+            <button class="btn-ghost" onclick='previewTemplate(${JSON.stringify(fn)})'><i class="fa-solid fa-eye"></i> عرض</button>
+            ${isPdf ? `<button class="btn-ghost" onclick='openPdfPositions(${JSON.stringify(fn)})'><i class="fa-solid fa-map-pin"></i> مواضع</button>` : ''}
+            ${isDefault ? '' : `<button class="btn-primary" onclick='setDefaultTemplate(${JSON.stringify(fn)})'><i class="fa-solid fa-star"></i> افتراضي</button>`}
+            <button class="btn-ghost" onclick='openRenameTemplate(${JSON.stringify(fn)})'><i class="fa-solid fa-pen"></i> تعديل</button>
+            <button class="btn-danger" onclick='deleteTemplate(${JSON.stringify(fn)})'><i class="fa-solid fa-trash"></i> حذف</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function setDefaultTemplate(fileName){
+  const name = String(fileName||'').trim();
+  if(!name) return;
+  try {
+    const res = await fetch('/api/admin/docx-templates/default',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({template_name:name})
+    });
+    const data = await res.json();
+    if(!res.ok||!data.success) return toast(data.error||'تعذر تعيين القالب الافتراضي','error');
+    defaultTemplateName = String(data.default_template||'').trim();
+    renderTemplates();
+    toast('تم تعيين القالب الافتراضي');
+  } catch { toast('تعذر الاتصال بالخادم','error'); }
+}
+
+function openRenameTemplate(fileName){
+  const name = String(fileName||'').trim();
+  if(!name) return;
+  document.getElementById('rename-old-name').value = name;
+  document.getElementById('rename-old-name-view').value = name;
+  document.getElementById('rename-new-name').value = name;
+  openModal('rename-template-modal');
+}
+
+async function saveRenameTemplate(){
+  const oldName = String(document.getElementById('rename-old-name').value||'').trim();
+  let newName   = String(document.getElementById('rename-new-name').value||'').trim();
+  if(!oldName||!newName) return toast('أدخل الاسم الجديد','error');
+  const isPdf = oldName.toLowerCase().endsWith('.pdf');
+  if(isPdf && !newName.toLowerCase().endsWith('.pdf')) newName += '.pdf';
+  if(!isPdf && !newName.toLowerCase().endsWith('.docx')) newName += '.docx';
+  try {
+    const res = await fetch(`/api/admin/docx-templates/${encodeURIComponent(oldName)}`,{
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({new_name:newName})
+    });
+    const data = await res.json();
+    if(!res.ok||!data.success) return toast(data.error||'تعذر تعديل القالب','error');
+    closeModal('rename-template-modal');
+    await loadTemplates();
+    toast('تم تعديل اسم القالب');
+  } catch { toast('تعذر الاتصال بالخادم','error'); }
+}
+
+async function deleteTemplate(fileName){
+  const name = String(fileName||'').trim();
+  if(!name) return;
+  if(!confirm(`هل تريد حذف القالب ${name}؟`)) return;
+  try {
+    const res = await fetch(`/api/admin/docx-templates/${encodeURIComponent(name)}`,{method:'DELETE'});
+    const data = await res.json();
+    if(!res.ok||!data.success) return toast(data.error||'تعذر حذف القالب','error');
+    defaultTemplateName = String(data.default_template||'').trim();
+    await loadTemplates();
+    toast('تم حذف القالب');
+  } catch { toast('تعذر الاتصال بالخادم','error'); }
+}
+
+async function uploadTemplate(){
+  const input = document.getElementById('tpl-upload-input');
+  const file  = input?.files?.[0];
+  if(!file) return toast('اختر ملف DOCX أو PDF أولاً','error');
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(!['docx','pdf'].includes(ext)) return toast('الملف يجب أن يكون DOCX أو PDF','error');
+
+  const btn = document.getElementById('tpl-upload-btn');
+  if(btn){ btn.disabled=true; btn.textContent='جارٍ الرفع...'; }
+
+  try {
+    const fd = new FormData();
+    fd.append('template', file);
+    const res = await fetch('/api/admin/docx-templates/upload',{method:'POST',body:fd});
+    const data = await res.json();
+    if(!res.ok||!data.success) return toast(data.error||'فشل رفع القالب','error');
+    input.value='';
+    closeModal('upload-template-modal');
+    await loadTemplates();
+    toast('تم رفع القالب بنجاح');
+    // If PDF, immediately open positions editor
+    const tpl = data.template||{};
+    if(String(tpl.file_type||'') === 'pdf'){
+      setTimeout(()=> openPdfPositions(tpl.file_name), 400);
+    }
+  } catch { toast('تعذر الاتصال بالخادم','error'); }
+  finally { if(btn){ btn.disabled=false; btn.innerHTML='رفع القالب'; } }
+}
+
+async function previewTemplate(fileName){
+  const name = String(fileName||'').trim();
+  if(!name) return;
+  const titleEl = document.getElementById('preview-template-title');
+  const bodyEl  = document.getElementById('preview-template-body');
+  if(titleEl) titleEl.innerHTML = `<strong style="direction:ltr">${esc(name)}</strong>`;
+  if(bodyEl) bodyEl.innerHTML = 'جارٍ تحميل المعاينة...';
+  openModal('preview-template-modal');
+  try {
+    const res  = await fetch(`/api/docx-templates/${encodeURIComponent(name)}/preview`,{headers:{'Accept':'application/json'}});
+    const data = await res.json();
+    if(!res.ok||!data.success) throw new Error(data.error||'تعذر تحميل المعاينة');
+
+    if(data.file_type === 'pdf'){
+      if(bodyEl){
+        const cfg = data.config || {};
+        const an  = cfg.archive_number||{}; const dt = cfg.date||{};
+        const ct  = cfg.content||{};        const qr  = cfg.qr||{};
+        bodyEl.innerHTML = `
+          ${data.page_image ? `<div class="tpl-preview-images"><img src="${data.page_image}" alt="معاينة"></div>` : '<p style="color:var(--text3);font-size:12px">لا يوجد معاينة للصورة</p>'}
+          <div class="tpl-preview-lines" style="direction:ltr;font-size:11px">
+            <div>📌 رقم الأرشيف → X: ${an.x??0.92}  Y: ${an.y??0.068}  خط: ${an.font_size??11}</div>
+            <div>📅 التاريخ/الوقت → X: ${dt.x??0.92}  Y: ${dt.y??0.112}  خط: ${dt.font_size??10}</div>
+            <div>📝 النص → X_right: ${ct.x_right??0.92}  Y_start: ${ct.y_start??0.22}  Y_end: ${ct.y_end??0.83}  خط: ${ct.font_size??12}</div>
+            <div>🔷 QR → X: ${qr.x??0.04}  Y: ${qr.y??0.875}  الحجم: ${qr.size??0.11}</div>
+          </div>
+          <div style="margin-top:10px">
+            <button class="btn-primary" onclick="closeModal('preview-template-modal');openPdfPositions(${JSON.stringify(name)})">
+              <i class="fa-solid fa-map-pin"></i> تعديل المواضع
+            </button>
+          </div>`;
+      }
+      return;
+    }
+
+    // DOCX preview
+    const preview = data.preview || {};
+    const images  = Array.isArray(preview.header_images) ? preview.header_images.filter(Boolean) : [];
+    const lines   = [...(preview.header_lines||[]), ...(preview.body_lines||[])].filter(Boolean);
+    if(bodyEl){
+      bodyEl.innerHTML = `
+        ${images.length ? `<div class="tpl-preview-images">${images.map(s=>`<img src="${s}" alt="preview">`).join('')}</div>` : ''}
+        <div class="tpl-preview-lines">
+          ${lines.length ? lines.map(l=>`<div>${esc(l)}</div>`).join('') : '<div style="color:var(--text3)">لا توجد أسطر</div>'}
+        </div>`;
+    }
+  } catch(err) {
+    if(bodyEl) bodyEl.innerHTML = `<div style="font-size:12px;color:var(--red)">${esc(err.message||'تعذر تحميل المعاينة')}</div>`;
+  }
+}
+
+// ── PDF Position Editor ────────────────────────────────────────────────────
+async function openPdfPositions(fileName){
+  const name = String(fileName||'').trim();
+  if(!name) return;
+  _pdfPosTplName = name;
+  _pdfPosActive  = null;
+
+  document.getElementById('pdf-pos-tpl-name').textContent = name;
+  document.getElementById('pdf-pos-fields').innerHTML = 'جارٍ التحميل...';
+  openModal('pdf-positions-modal');
+
+  try {
+    const res  = await fetch(`/api/docx-templates/${encodeURIComponent(name)}/preview`,{headers:{'Accept':'application/json'}});
+    const data = await res.json();
+    if(!res.ok||!data.success) throw new Error(data.error||'خطأ');
+    _pdfPosConfig = data.config || JSON.parse(JSON.stringify({
+      archive_number:{x:0.92,y:0.068,font_size:11},
+      date:{x:0.92,y:0.112,font_size:10},
+      content:{x_right:0.92,y_start:0.22,y_end:0.83,font_size:12,line_height:18},
+      qr:{x:0.04,y:0.875,size:0.11}
+    }));
+    const img = document.getElementById('pdf-pos-page-img');
+    if(data.page_image){ img.src = data.page_image; img.style.display='block'; }
+    else { img.style.display='none'; }
+    _renderPdfPosFields();
+    _renderPdfPosMarkers();
+    // Bind image click
+    const wrap = document.getElementById('pdf-pos-canvas-wrap');
+    wrap.onclick = _onPdfPosImgClick;
+  } catch(err) {
+    document.getElementById('pdf-pos-fields').innerHTML = `<div style="color:var(--red);font-size:12px">${esc(err.message)}</div>`;
+  }
+}
+
+function _renderPdfPosFields(){
+  const container = document.getElementById('pdf-pos-fields');
+  if(!container) return;
+  container.innerHTML = _PDF_POS_FIELDS.map(group => {
+    const cfg = _pdfPosConfig[group.key] || {};
+    const rows = group.fields.map(fld => `
+      <div>
+        <label>${fld.label}</label>
+        <input type="number" min="${fld.min}" max="${fld.max}" step="${fld.step}"
+          id="pf_${group.key}_${fld.f}"
+          value="${parseFloat(cfg[fld.f]??0).toFixed(fld.step<1?2:0)}"
+          oninput="_onPdfFieldInput('${group.key}','${fld.f}',this.value)">
+      </div>`).join('');
+    const clickFields = group.fields.filter(f=>['x','y','x_right','y_start','y_end'].includes(f.f));
+    const clickBtns = clickFields.map(fld=>
+      `<button class="btn-ghost" style="font-size:10px;padding:3px 8px;margin-top:6px;color:${group.color}"
+        onclick="_setPdfPosActive('${group.key}','${fld.f}')">
+        🖱️ اختر ${fld.label}
+      </button>`).join(' ');
+    return `<div class="pdf-pos-group" data-group="${group.key}">
+      <h4 style="color:${group.color}">● ${group.label}</h4>
+      <div class="row2">${rows}</div>
+      <div>${clickBtns}</div>
+    </div>`;
+  }).join('');
+}
+
+function _renderPdfPosMarkers(){
+  const wrap = document.getElementById('pdf-pos-canvas-wrap');
+  if(!wrap) return;
+  // Remove old markers
+  wrap.querySelectorAll('.pdf-marker').forEach(m=>m.remove());
+  const img = document.getElementById('pdf-pos-page-img');
+  const iw = img.clientWidth || 1;
+  const ih = img.clientHeight || 1;
+
+  _PDF_POS_FIELDS.forEach(group => {
+    const cfg = _pdfPosConfig[group.key] || {};
+    const xKey = group.key==='content' ? 'x_right' : 'x';
+    const yKey = group.key==='content' ? 'y_start' : 'y';
+    const xr = parseFloat(cfg[xKey]??0);
+    const yr = parseFloat(cfg[yKey]??0);
+    const xpx = xr * iw;
+    const ypx = yr * ih;
+    const marker = document.createElement('div');
+    marker.className = 'pdf-marker';
+    marker.style.cssText = `left:0;top:0;width:0;height:0;`;
+    const dot = document.createElement('div');
+    dot.className = 'pdf-marker-dot';
+    dot.style.cssText = `left:${xpx}px;top:${ypx}px;color:${group.color}`;
+    const lbl = document.createElement('div');
+    lbl.className = 'pdf-marker-label';
+    lbl.style.cssText = `left:${xpx}px;top:${ypx + 8}px`;
+    lbl.textContent = group.label;
+    marker.appendChild(dot);
+    marker.appendChild(lbl);
+    wrap.appendChild(marker);
+    // For content, also show y_end
+    if(group.key === 'content' && cfg.y_end != null){
+      const ye = parseFloat(cfg.y_end) * ih;
+      const dot2 = document.createElement('div');
+      dot2.className = 'pdf-marker-dot';
+      dot2.style.cssText = `left:${xpx}px;top:${ye}px;color:${group.color};opacity:0.5`;
+      const lbl2 = document.createElement('div');
+      lbl2.className = 'pdf-marker-label';
+      lbl2.style.cssText = `left:${xpx}px;top:${ye+8}px;opacity:0.6`;
+      lbl2.textContent = 'نهاية النص';
+      marker.appendChild(dot2);
+      marker.appendChild(lbl2);
+    }
+  });
+}
+
+function _setPdfPosActive(groupKey, fieldKey){
+  _pdfPosActive = {groupKey, fieldKey};
+  const wrap = document.getElementById('pdf-pos-canvas-wrap');
+  if(wrap) wrap.style.outline = '3px solid var(--accent)';
+  toast(`انقر على الصفحة لتحديد موضع: ${fieldKey} (${groupKey})`);
+}
+
+function _onPdfPosImgClick(e){
+  if(!_pdfPosActive) return;
+  const img = document.getElementById('pdf-pos-page-img');
+  const rect = img.getBoundingClientRect();
+  const xr = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const yr = Math.max(0, Math.min(1, (e.clientY - rect.top)  / rect.height));
+  const val = (['x','y','x_right','y_start','y_end'].includes(_pdfPosActive.fieldKey)) ? (
+    _pdfPosActive.fieldKey.startsWith('y') ? yr.toFixed(3) : xr.toFixed(3)
+  ) : xr.toFixed(3);
+
+  if(!_pdfPosConfig[_pdfPosActive.groupKey]) _pdfPosConfig[_pdfPosActive.groupKey] = {};
+  _pdfPosConfig[_pdfPosActive.groupKey][_pdfPosActive.fieldKey] = parseFloat(val);
+
+  const inp = document.getElementById(`pf_${_pdfPosActive.groupKey}_${_pdfPosActive.fieldKey}`);
+  if(inp) inp.value = val;
+
+  _pdfPosActive = null;
+  const wrap = document.getElementById('pdf-pos-canvas-wrap');
+  if(wrap) wrap.style.outline = '';
+  _renderPdfPosMarkers();
+}
+
+function _onPdfFieldInput(groupKey, fieldKey, val){
+  if(!_pdfPosConfig[groupKey]) _pdfPosConfig[groupKey] = {};
+  _pdfPosConfig[groupKey][fieldKey] = parseFloat(val)||0;
+  _renderPdfPosMarkers();
+}
+
+async function savePdfPositions(){
+  if(!_pdfPosTplName) return;
+  const btn = document.getElementById('pdf-pos-save-btn');
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> جارٍ الحفظ...'; }
+  try {
+    const res = await fetch(`/api/admin/docx-templates/${encodeURIComponent(_pdfPosTplName)}`,{
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({config: _pdfPosConfig})
+    });
+    const data = await res.json();
+    if(!res.ok||!data.success) return toast(data.error||'تعذر حفظ المواضع','error');
+    closeModal('pdf-positions-modal');
+    toast('تم حفظ مواضع القالب بنجاح');
+  } catch { toast('تعذر الاتصال بالخادم','error'); }
+  finally { if(btn){ btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> حفظ المواضع'; } }
+}
+
+loadTemplates();
+</script>
+{% endblock %}

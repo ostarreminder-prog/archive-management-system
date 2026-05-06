@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% block title %}الملف الشخصي{% endblock %}
+{% block page_title %}الملف الشخصي{% endblock %}
+{% block page_sub %}إدارة بياناتك وتوقيعك وأجهزتك{% endblock %}
+
+{% block extra_css %}
+<style>
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;width:fit-content}
+.tab{padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text3);transition:all .2s;border:none;background:none;font-family:'IBM Plex Sans Arabic',sans-serif}
+.tab.active{background:var(--accent-dim);color:var(--accent)}
+.tab-pane{display:none}.tab-pane.active{display:block;animation:fadeUp .3s ease}
+.section{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:22px;margin-bottom:16px}
+.sec-title{font-size:13px;font-weight:700;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-label{font-size:12px;color:var(--text3)}
+.info-val{font-size:13px;font-weight:600}
+.sig-box{background:var(--card2);border:2px dashed var(--border2);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px}
+.sig-box:hover{border-color:var(--accent)}
+.sig-box img{max-width:200px;max-height:80px;object-fit:contain}
+.device-card{background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px;transition:border-color .2s}
+.device-card:hover{border-color:var(--border2)}
+.device-card.trusted{border-color:rgba(52,211,153,.2)}
+.device-card.pending{border-color:rgba(232,168,48,.2)}
+.dev-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.dev-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.dev-ip{font-size:11px;color:var(--text3);direction:ltr;text-align:right}
+.dev-badge{margin-right:auto;flex-shrink:0}
+.pass-field{background:var(--card2);border:1.5px solid var(--border2);border-radius:9px;padding:11px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:14px;outline:none;transition:all .2s;width:100%;margin-bottom:10px}
+.pass-field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.stamps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:12px}
+.stamp-card{background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px}
+.stamp-card img{width:100%;height:100px;object-fit:contain;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px}
+.signature-card img{width:100%;height:86px;object-fit:contain;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px}
+.stamp-name{font-size:12px;font-weight:600;margin:8px 0 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asset-meta{font-size:10px;color:var(--text3);margin-bottom:8px}
+.stamp-actions{display:flex;justify-content:flex-end}
+.asset-select{width:100%;background:var(--card2);border:1.5px solid var(--border2);border-radius:8px;padding:7px 10px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;margin-bottom:8px}
+.asset-select:focus{border-color:var(--accent)}
+
+@media (max-width:760px){
+  .tabs{width:100%;overflow-x:auto;white-space:nowrap}
+  .tab{flex-shrink:0;padding:8px 14px}
+  .section{padding:14px}
+  .info-row{flex-direction:column;align-items:flex-start;gap:4px}
+  .device-card{flex-direction:column;align-items:flex-start}
+  .dev-badge{margin-right:0}
+  .stamps-grid{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- رأس الصفحة -->
+<div class="section" style="display:flex;align-items:center;gap:16px">
+  <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#b7791f);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;flex-shrink:0">
+    {{ user.name[0] }}
+  </div>
+  <div>
+    <div style="font-size:18px;font-weight:700">{{ user.name }}</div>
+    <div style="font-size:12px;color:var(--text3)">{{ user.email }}</div>
+    <div style="margin-top:6px">
+      <span class="badge {{ {'admin':'badge-admin','manager':'badge-manager','user':'badge-user'}[user.role] }}">
+        {{ {'admin':'مدير عام','manager':'مدير','user':'موظف'}[user.role] }}
+      </span>
+      {% if user.job_title %}
+      <span style="font-size:11px;color:var(--text3);margin-right:8px">{{ user.job_title }}</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('t1',this)"><i class="fa-solid fa-id-card"></i> البيانات</button>
+  <button class="tab" onclick="showTab('t2',this)"><i class="fa-solid fa-signature"></i> التوقيع</button>
+  <button class="tab" onclick="showTab('t3',this)"><i class="fa-solid fa-lock"></i> كلمة المرور</button>
+  <button class="tab" onclick="showTab('t4',this)"><i class="fa-solid fa-computer"></i> الأجهزة</button>
+</div>
+
+<!-- Tab 1: البيانات -->
+<div class="tab-pane active" id="t1">
+  <div class="section">
+    <div class="sec-title">المعلومات الشخصية</div>
+    <div class="info-row"><span class="info-label">الاسم</span><span class="info-val">{{ user.name }}</span></div>
+    <div class="info-row"><span class="info-label">البريد</span><span class="info-val" style="direction:ltr">{{ user.email }}</span></div>
+    <div class="info-row"><span class="info-label">الجوال</span><span class="info-val" style="direction:ltr">{{ user.phone or '—' }}</span></div>
+    <div class="info-row"><span class="info-label">المسمى الوظيفي</span><span class="info-val">{{ user.job_title or '—' }}</span></div>
+    <div class="info-row"><span class="info-label">القسم</span><span class="info-val">{{ user.archive_section or 'عام' }} ({{ user.archive_section_code or 'GN' }})</span></div>
+    <div class="info-row"><span class="info-label">الدور</span>
+      <span class="badge {{ {'admin':'badge-admin','manager':'badge-manager','user':'badge-user'}[user.role] }}">
+        {{ {'admin':'مدير عام','manager':'مدير','user':'موظف'}[user.role] }}
+      </span>
+    </div>
+    {% if user.stamp_text %}
+      <div class="info-row"><span class="info-label">نص الختم</span><span class="info-val" style="color:var(--gold)"><i class="fa-solid fa-stamp"></i> {{ user.stamp_text }}</span></div>
+    {% endif %}
+    <div class="info-row"><span class="info-label">تاريخ الانضمام</span><span class="info-val" style="font-size:12px;color:var(--text2)">{{ (user.created_at or '')[:10] }}</span></div>
+  </div>
+</div>
+
+<!-- Tab 2: التوقيع -->
+<div class="tab-pane" id="t2">
+  <div class="section">
+    <div class="sec-title">التواقيع (متعدد)</div>
+    <p style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.7">
+      يمكنك رفع أكثر من توقيع والاختيار منها لاحقاً داخل صفحة التوقيع.
+    </p>
+    <input type="text" class="pass-field" id="signature-name" placeholder="اسم التوقيع (اختياري)">
+    <input type="file" id="sig-input" accept=".png,.jpg,.jpeg" style="display:none" onchange="uploadSig()">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-primary" onclick="document.getElementById('sig-input').click()"><i class="fa-solid fa-cloud-arrow-up"></i> رفع توقيع جديد</button>
+      <button class="btn-ghost" onclick="loadSignatures()"><i class="fa-solid fa-rotate"></i> تحديث القائمة</button>
+    </div>
+    <div id="signatures-list" class="stamps-grid"></div>
+  </div>
+  <div class="section">
+    <div class="sec-title">الأختام (متعدد)</div>
+    <p style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.7">
+      يمكنك رفع أكثر من ختم للحفظ والاختيار منه لاحقاً بحسب صلاحياتك داخل النظام.
+    </p>
+    <input type="text" class="pass-field" id="stamp-name" placeholder="اسم الختم (اختياري)">
+    <input type="file" id="stamp-input" accept=".png,.jpg,.jpeg,.webp" style="display:none" onchange="uploadStamp()">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-primary" onclick="document.getElementById('stamp-input').click()"><i class="fa-solid fa-cloud-arrow-up"></i> رفع ختم جديد</button>
+      <button class="btn-ghost" onclick="loadStamps()"><i class="fa-solid fa-rotate"></i> تحديث القائمة</button>
+    </div>
+    <div id="stamps-list" class="stamps-grid"></div>
+  </div>
+</div>
+
+<!-- Tab 3: كلمة المرور -->
+<div class="tab-pane" id="t3">
+  <div class="section">
+    <div class="sec-title">تغيير كلمة المرور</div>
+    <input type="password" class="pass-field" id="cp1" placeholder="كلمة المرور الجديدة (8 أحرف على الأقل)">
+    <input type="password" class="pass-field" id="cp2" placeholder="تأكيد كلمة المرور">
+    <button class="btn-primary" onclick="changePass()"><i class="fa-solid fa-key"></i> تغيير كلمة المرور</button>
+  </div>
+</div>
+
+<!-- Tab 4: الأجهزة -->
+<div class="tab-pane" id="t4">
+  <div class="section">
+    <div class="sec-title">الأجهزة الموثوقة</div>
+    <div id="devices-list">
+      {% if devices %}
+        {% for d in devices %}
+        <div class="device-card {{ 'trusted' if d.trusted else 'pending' }}">
+          <div class="dev-icon" style="background:{{ 'var(--green-dim)' if d.trusted else 'var(--gold-dim)' }}">
+            {% if 'جوال' in (d.device_name or '') %}
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            {% else %}
+            <i class="fa-solid fa-computer"></i>
+            {% endif %}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="dev-name">{{ d.device_name or 'جهاز غير معروف' }}</div>
+            <div class="dev-ip">{{ d.ip_address or '—' }} • {{ (d.created_at or '')[:10] }}</div>
+          </div>
+          <div class="dev-badge">
+            <span class="badge {{ 'badge-approved' if d.trusted else 'badge-pending' }}">
+              {{ 'موثوق' if d.trusted else 'بانتظار التأكيد' }}
+            </span>
+          </div>
+          {% if d.trusted %}
+          <button class="btn-danger" onclick="removeDevice({{ d.id }})"><i class="fa-solid fa-trash"></i></button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty"><div class="empty-icon"><i class="fa-solid fa-computer"></i></div><div class="empty-text">لا توجد أجهزة مسجلة</div></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(id, btn){
+  document.querySelectorAll('.tab-pane').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+async function uploadSig(){
+  const input = document.getElementById('sig-input');
+  const file = input?.files?.[0];
+  if(!file) return;
+  const fd = new FormData();
+  fd.append('signature', file);
+  const nm = document.getElementById('signature-name')?.value?.trim();
+  if(nm) fd.append('name', nm);
+
+  const res  = await fetch('/api/profile/signatures',{method:'POST',body:fd});
+  const data = await res.json();
+  if(data.success){
+    toast('تم رفع التوقيع');
+    if(document.getElementById('signature-name')) document.getElementById('signature-name').value='';
+    if(input) input.value='';
+    loadSignatures();
+  } else toast(data.error||'فشل الرفع','error');
+}
+
+let _visibilityTargets = null;
+
+async function _loadVisibilityTargets(){
+  if(_visibilityTargets) return _visibilityTargets;
+  try{
+    const res  = await fetch('/api/profile/signature-visibility-targets',{headers:{'Accept':'application/json'}});
+    const data = await res.json();
+    _visibilityTargets = (data.targets || []);
+  } catch{ _visibilityTargets = []; }
+  return _visibilityTargets;
+}
+
+function _scopeLabel(scope){
+  if(scope==='all')      return 'للجميع';
+  if(scope==='managers') return 'للمدراء فقط';
+  if(scope==='self')     return 'لا أحد';
+  if(scope==='specific') return 'مستخدم محدد';
+  return 'لا أحد';
+}
+
+async function loadSignatures(){
+  const list = document.getElementById('signatures-list');
+  if(!list) return;
+  try {
+    const [res, targets] = await Promise.all([
+      fetch('/api/profile/signatures', {headers:{'Accept':'application/json'}}),
+      _loadVisibilityTargets()
+    ]);
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      list.innerHTML = '<div class="empty"><div class="empty-text">لا يمكن تحميل التواقيع</div></div>';
+      return;
+    }
+    const signatures = Array.isArray(data.signatures) ? data.signatures : [];
+    if(!signatures.length){
+      list.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-text">لا توجد تواقيع مرفوعة بعد</div></div>';
+      return;
+    }
+    const targetsOpts = targets.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+    list.innerHTML = signatures.map(s => {
+      const scope = s.visibility_scope || 'self';
+      return `
+      <div class="stamp-card signature-card">
+        <img src="/static/${s.signature_path}" alt="signature">
+        <div class="stamp-name">${s.signature_name || ('توقيع #' + s.id)}</div>
+        <div class="asset-meta">${(s.created_at || '').slice(0,16).replace('T',' ') || '—'}</div>
+        <div style="margin:8px 0 4px;font-size:11px;color:var(--text3)">نطاق الظهور</div>
+        <select id="scope-${s.id}" class="asset-select" style="margin-bottom:6px;font-size:12px" onchange="toggleTargetRow(${s.id})">
+          <option value="self"     ${scope==='self'     ?'selected':''}>لا أحد</option>
+          <option value="specific" ${scope==='specific' ?'selected':''}>مستخدم محدد</option>
+          <option value="managers" ${scope==='managers' ?'selected':''}>للمدراء فقط</option>
+          <option value="all"      ${scope==='all'      ?'selected':''}>للجميع</option>
+        </select>
+        <div id="target-row-${s.id}" style="display:${scope==='specific'?'block':'none'};margin-bottom:6px">
+          <select id="target-${s.id}" class="asset-select" style="font-size:12px">
+            ${targetsOpts}
+          </select>
+        </div>
+        <div class="stamp-actions" style="gap:6px">
+          <button class="btn-ghost" style="flex:1;font-size:12px" onclick="saveSignatureVisibility(${s.id})"><i class="fa-solid fa-sliders"></i> حفظ</button>
+          <button class="btn-danger" onclick="deleteSignature(${s.id})"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>`;
+    }).join('');
+
+    // set correct selected target after render
+    signatures.forEach(s=>{
+      if((s.visibility_scope||'self')==='specific' && s.visible_to_user_id){
+        const el = document.getElementById(`target-${s.id}`);
+        if(el) el.value = s.visible_to_user_id;
+      }
+    });
+  } catch {
+    list.innerHTML = '<div class="empty"><div class="empty-text">تعذر تحميل التواقيع</div></div>';
+  }
+}
+
+function toggleTargetRow(id){
+  const scope = document.getElementById(`scope-${id}`)?.value;
+  const row   = document.getElementById(`target-row-${id}`);
+  if(row) row.style.display = scope==='specific' ? 'block' : 'none';
+}
+
+async function saveSignatureVisibility(id){
+  const scope    = document.getElementById(`scope-${id}`)?.value || 'self';
+  const targetEl = document.getElementById(`target-${id}`);
+  const targetId = scope==='specific' && targetEl ? parseInt(targetEl.value)||null : null;
+
+  const res  = await fetch(`/api/signature-assets/${id}/visibility`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({visibility_scope: scope, visible_to_user_id: targetId})
+  });
+  const data = await res.json();
+  if(res.ok && data.success){
+    toast(`تم حفظ الظهور: ${data.visibility_label || _scopeLabel(scope)}`);
+  } else {
+    toast(data.error || 'فشل الحفظ', 'error');
+  }
+}
+
+async function deleteSignature(id){
+  if(!confirm('حذف هذا التوقيع؟')) return;
+  const res = await fetch(`/api/profile/signatures/${id}`, {method:'DELETE'});
+  const data = await res.json();
+  if(res.ok && data.success){
+    toast('تم حذف التوقيع');
+    loadSignatures();
+  } else {
+    toast(data.error || 'فشل الحذف', 'error');
+  }
+}
+
+async function changePass(){
+  const p1 = document.getElementById('cp1').value;
+  const p2 = document.getElementById('cp2').value;
+  if(p1.length<8) return toast('كلمة المرور يجب 8 أحرف على الأقل','error');
+  if(p1!==p2)     return toast('كلمتا المرور غير متطابقتان','error');
+  const res  = await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_password:p1})});
+  const data = await res.json();
+  if(data.success){ toast('تم تغيير كلمة المرور'); document.getElementById('cp1').value=''; document.getElementById('cp2').value=''; }
+  else toast(data.error,'error');
+}
+
+async function removeDevice(id){
+  if(!confirm('إزالة هذا الجهاز من الأجهزة الموثوقة؟')) return;
+  const res  = await fetch(`/api/devices/${id}`,{method:'DELETE'});
+  const data = await res.json();
+  if(data.success){ toast('تم الحذف'); location.reload(); }
+  else toast('فشل الحذف','error');
+}
+
+async function loadStamps(){
+  const list = document.getElementById('stamps-list');
+  if(!list) return;
+  try {
+    const [res, targets] = await Promise.all([
+      fetch('/api/profile/stamps', {headers:{'Accept':'application/json'}}),
+      _loadVisibilityTargets()
+    ]);
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      list.innerHTML = '<div class="empty"><div class="empty-text">لا يمكن تحميل الأختام</div></div>';
+      return;
+    }
+    const stamps = Array.isArray(data.stamps) ? data.stamps : [];
+    if(!stamps.length){
+      list.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-text">لا توجد أختام مرفوعة بعد</div></div>';
+      return;
+    }
+    const targetsOpts = targets.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+    list.innerHTML = stamps.map(s => {
+      const rawScope = s.visibility_scope || 'self';
+      const scope = ['all','managers','specific','self'].includes(rawScope) ? rawScope : 'self';
+      return `
+      <div class="stamp-card">
+        <img src="/static/${s.stamp_path}" alt="stamp">
+        <div class="stamp-name">${s.stamp_name || ('ختم #' + s.id)}</div>
+        <div style="margin:8px 0 4px;font-size:11px;color:var(--text3)">نطاق الظهور</div>
+        <select id="stamp-scope-${s.id}" class="asset-select" style="margin-bottom:6px;font-size:12px" onchange="toggleStampTargetRow(${s.id})">
+          <option value="all"      ${scope==='all'      ?'selected':''}>للجميع</option>
+          <option value="managers" ${scope==='managers' ?'selected':''}>للمدراء فقط</option>
+          <option value="self"     ${scope==='self'     ?'selected':''}>لا أحد</option>
+          <option value="specific" ${scope==='specific' ?'selected':''}>مستخدم محدد</option>
+        </select>
+        <div id="stamp-target-row-${s.id}" style="display:${scope==='specific'?'block':'none'};margin-bottom:6px">
+          <select id="stamp-target-${s.id}" class="asset-select" style="font-size:12px">
+            ${targetsOpts}
+          </select>
+        </div>
+        <div class="stamp-actions" style="gap:6px">
+          <button class="btn-ghost" style="flex:1;font-size:12px" onclick="saveStampVisibility(${s.id})"><i class="fa-solid fa-sliders"></i> حفظ</button>
+          <button class="btn-danger" onclick="deleteStamp(${s.id})"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>`;
+    }).join('');
+
+    stamps.forEach(s=>{
+      if((s.visibility_scope||'self')==='specific' && s.visible_to_user_id){
+        const el = document.getElementById(`stamp-target-${s.id}`);
+        if(el) el.value = s.visible_to_user_id;
+      }
+    });
+  } catch {
+    list.innerHTML = '<div class="empty"><div class="empty-text">تعذر تحميل الأختام</div></div>';
+  }
+}
+
+function toggleStampTargetRow(id){
+  const scope = document.getElementById(`stamp-scope-${id}`)?.value;
+  const row   = document.getElementById(`stamp-target-row-${id}`);
+  if(row) row.style.display = scope==='specific' ? 'block' : 'none';
+}
+
+async function saveStampVisibility(id){
+  const scope    = document.getElementById(`stamp-scope-${id}`)?.value || 'self';
+  const targetEl = document.getElementById(`stamp-target-${id}`);
+  const targetId = scope==='specific' && targetEl ? parseInt(targetEl.value)||null : null;
+
+  const res  = await fetch(`/api/stamp-assets/${id}/visibility`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({visibility_scope: scope, visible_to_user_id: targetId})
+  });
+  const data = await res.json();
+  if(res.ok && data.success){
+    toast(`تم حفظ الظهور: ${data.visibility_label || _scopeLabel(scope)}`);
+  } else {
+    toast(data.error || 'فشل الحفظ', 'error');
+  }
+}
+
+async function uploadStamp(){
+  const input = document.getElementById('stamp-input');
+  const file = input?.files?.[0];
+  if(!file) return;
+  const fd = new FormData();
+  fd.append('stamp', file);
+  const nm = document.getElementById('stamp-name')?.value?.trim();
+  if(nm) fd.append('name', nm);
+
+  const res = await fetch('/api/profile/stamps', {method:'POST', body:fd});
+  const data = await res.json();
+  if(res.ok && data.success){
+    toast('تم رفع الختم');
+    if(document.getElementById('stamp-name')) document.getElementById('stamp-name').value='';
+    input.value='';
+    loadStamps();
+  } else {
+    toast(data.error || 'فشل رفع الختم', 'error');
+  }
+}
+
+async function deleteStamp(id){
+  if(!confirm('حذف هذا الختم؟')) return;
+  const res = await fetch(`/api/profile/stamps/${id}`, {method:'DELETE'});
+  const data = await res.json();
+  if(res.ok && data.success){
+    toast('تم حذف الختم');
+    loadStamps();
+  } else {
+    toast(data.error || 'فشل الحذف', 'error');
+  }
+}
+
+loadSignatures();
+loadStamps();
+</script>
+{% endblock %}

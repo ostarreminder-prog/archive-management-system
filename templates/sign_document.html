@@ -1,0 +1,712 @@
+{% extends "base.html" %}
+{% block title %}توقيع الوثيقة{% endblock %}
+{% block page_title %}توقيع الوثيقة{% endblock %}
+{% block page_sub %}{{ doc.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.sign-layout{display:grid;grid-template-columns:1fr 340px;gap:16px;height:calc(100vh - 130px)}
+.sign-layout.locked{pointer-events:none;filter:blur(2px);opacity:.35;user-select:none}
+
+/* Lock screen */
+.sign-lock{position:fixed;inset:0;background:rgba(5,6,8,.84);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:320;padding:20px}
+.sign-lock-card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:24px}
+.sign-lock-title{font-size:18px;font-weight:700;margin-bottom:8px}
+.sign-lock-sub{font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.7}
+
+/* PDF Canvas */
+.pdf-wrap{background:var(--card);border:1px solid var(--border2);border-radius:14px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.pdf-toolbar{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface)}
+.page-info{font-size:12px;color:var(--text3);margin:0 8px}
+.pdf-container{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:16px;background:var(--surface);position:relative}
+#pdf-canvas-wrap{position:relative;display:inline-block;cursor:crosshair;user-select:none}
+#pdf-canvas{display:block;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#sign-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+
+/* الاختيار المتحرك */
+.drop-item{position:absolute;cursor:move;user-select:none;border:none;outline:2px dashed transparent;border-radius:6px;transition:outline-color .2s;padding:0;box-sizing:border-box;touch-action:none}
+.drop-item:hover{outline-color:var(--accent)}
+.drop-item.selected{outline-color:var(--accent);background:transparent}
+.drop-item img{display:block;pointer-events:none}
+.drop-item .del-btn{position:absolute;top:-8px;right:-8px;width:18px;height:18px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;cursor:pointer;line-height:1}
+
+/* Panel */
+.sign-panel{display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.panel-sec{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:16px}
+.panel-title{font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px}
+
+/* Type selector */
+.type-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.type-opt{background:var(--card2);border:1.5px solid var(--border2);border-radius:9px;padding:10px 6px;text-align:center;cursor:pointer;transition:all .2s}
+.type-opt:hover{border-color:var(--accent)}
+.type-opt.active{border-color:var(--accent);background:var(--accent-dim)}
+.type-opt.disabled{opacity:.3;cursor:not-allowed;pointer-events:none}
+.type-opt-icon{font-size:20px;margin-bottom:4px}
+.type-opt-label{font-size:10px;font-weight:700;color:var(--text2)}
+
+/* sig preview */
+.sig-preview-box{background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center;margin-bottom:10px;min-height:60px;display:flex;align-items:center;justify-content:center}
+.sig-preview-box img{max-width:160px;max-height:56px;object-fit:contain}
+
+/* stamp preview */
+.stamp-preview{width:90px;height:90px;margin:0 auto 10px;border-radius:50%;border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;background:var(--card2);font-size:11px;font-weight:700;color:var(--text2);text-align:center;padding:8px}
+
+/* stamp section should follow system theme colors */
+#stamp-section .asset-select{background:var(--card2);color:var(--text);border-color:var(--border2)}
+#stamp-section .asset-meta{color:var(--text3)}
+
+/* asset selectors */
+.asset-select{width:100%;background:var(--card2);border:1.5px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;transition:all .2s;margin-bottom:10px}
+.asset-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.asset-meta{font-size:11px;color:var(--text3);margin-bottom:8px}
+
+/* pass input */
+.pass-input{width:100%;background:var(--card2);border:1.5px solid var(--border2);border-radius:9px;padding:11px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:14px;outline:none;transition:all .2s;direction:ltr;letter-spacing:4px}
+.pass-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+
+/* confirm btn */
+.confirm-btn{width:100%;padding:14px;background:linear-gradient(135deg,#065f46,#059669);border:none;border-radius:10px;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s}
+.confirm-btn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(5,150,105,.3)}
+.confirm-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* hint */
+.hint{background:var(--accent-dim);border:1px solid rgba(166,90,42,.2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.6}
+.unlock-status.ok{background:rgba(5,150,105,.12);border-color:rgba(5,150,105,.3);color:#c3f7d9}
+
+@media (max-width:980px){
+  .sign-layout{grid-template-columns:1fr;height:auto;gap:10px}
+  .pdf-wrap{min-height:52vh}
+  .pdf-toolbar{flex-wrap:wrap;padding:8px 10px}
+  .pdf-toolbar > span:last-child{width:100%}
+  .pdf-container{padding:8px;max-height:70vh}
+  .sign-panel{overflow:visible;order:1}
+  .pdf-wrap{order:2}
+}
+
+@media (max-width:640px){
+  .pdf-toolbar .btn-ghost{padding:8px 10px}
+  .page-info{margin:0;font-size:11px}
+  #pdf-canvas{max-width:100%;height:auto}
+  .drop-item .del-btn{width:22px;height:22px;font-size:12px;top:-10px;right:-10px}
+  .panel-sec{padding:12px}
+  .type-grid{grid-template-columns:1fr}
+  .type-opt{padding:9px}
+  .confirm-btn{padding:12px;font-size:14px}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sign-layout" id="sign-layout">
+
+  <!-- Text Document Viewer (for text documents with templates) -->
+  <!-- PDF Viewer + Drag Area -->
+  <div class="pdf-wrap" id="pdf-doc-wrap">
+    <div class="pdf-toolbar">
+      <button class="btn-ghost" onclick="prevPage()" id="btn-prev"><i class="fa-solid fa-chevron-right"></i></button>
+      <span class="page-info">صفحة <span id="cur-page">1</span> من <span id="total-pages">{{ page_count }}</span></span>
+      <button class="btn-ghost" onclick="nextPage()" id="btn-next"><i class="fa-solid fa-chevron-left"></i></button>
+      <div style="flex:1"></div>
+      <span style="font-size:11px;color:var(--text3)"><i class="fa-solid fa-hand-pointer"></i> اسحب التوقيع/الختم باللمس أو الماوس لتحديد الموضع فقط بدون تغيير الحجم</span>
+    </div>
+    <div class="pdf-container">
+      <div id="pdf-canvas-wrap">
+        <canvas id="pdf-canvas"></canvas>
+        <div id="sign-overlay"></div>
+        <!-- صور مُفتوحة للسحب -->
+        <div id="drag-items"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control Panel -->
+  <div class="sign-panel">
+
+    <!-- نوع التوقيع -->
+    <div class="panel-sec">
+      <div class="panel-title">نوع التوقيع</div>
+      <div class="type-grid">
+        <div class="type-opt active" data-type="signature" onclick="setType('signature',this)">
+          <div class="type-opt-icon"><i class="fa-solid fa-signature"></i></div>
+          <div class="type-opt-label">توقيع</div>
+        </div>
+        {% if can_stamp %}
+        <div class="type-opt" data-type="stamp" onclick="setType('stamp',this)">
+          <div class="type-opt-icon"><i class="fa-solid fa-stamp"></i></div>
+          <div class="type-opt-label">ختم</div>
+        </div>
+        <div class="type-opt" data-type="both" onclick="setType('both',this)">
+          <div class="type-opt-icon"><i class="fa-solid fa-signature"></i> <i class="fa-solid fa-stamp"></i></div>
+          <div class="type-opt-label">كلاهما</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- معاينة التوقيع -->
+    <div class="panel-sec" id="sig-section">
+      <div class="panel-title">تواقيع النظام</div>
+      {% if signature_assets %}
+        <select class="asset-select" id="sig-owner-select" onchange="onSignatureOwnerChange()"></select>
+        <div class="asset-meta" id="sig-owner-meta">—</div>
+
+        <div class="sig-preview-box">
+          <img id="sig-img-preview" style="display:none">
+        </div>
+        <button class="btn-ghost" style="width:100%;margin-bottom:6px" onclick="addSigToCanvas()"><i class="fa-solid fa-plus"></i> أضف التوقيع المختار</button>
+      {% else %}
+        <div class="hint"><i class="fa-solid fa-triangle-exclamation"></i> لا توجد تواقيع متاحة حسب الصلاحيات الحالية</div>
+      {% endif %}
+    </div>
+
+    <!-- معاينة الختم -->
+    {% if can_stamp %}
+    <div class="panel-sec" id="stamp-section" style="display:none">
+      <div class="panel-title">أختام النظام</div>
+      {% if stamp_assets %}
+        <select class="asset-select" id="stamp-owner-select" onchange="onStampOwnerChange()"></select>
+        <div class="asset-meta" id="stamp-owner-meta">—</div>
+
+        <div class="stamp-preview" id="stamp-preview-box">—</div>
+        <button class="btn-ghost" style="width:100%;margin-bottom:6px" onclick="addStampToCanvas()"><i class="fa-solid fa-plus"></i> أضف الختم المختار</button>
+      {% else %}
+        <div class="hint"><i class="fa-solid fa-triangle-exclamation"></i> لا توجد أختام مفعلة في النظام حالياً</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- خيارات إضافية -->
+    <div class="panel-sec">
+      <div class="panel-title">خيارات إضافية</div>
+      {% if allow_qr_option %}
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)">
+        <input type="checkbox" id="include-qr" checked>
+        تضمين الباركود (QR) داخل الكلشية (اختياري)
+      </label>
+      {% else %}
+      <div class="hint" style="margin:0">
+        <i class="fa-solid fa-circle-info"></i> المستند المرفوع لا يتم تضمين QR بداخله.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ملخص -->
+    <div class="panel-sec">
+      <div class="panel-title">معلومات الوثيقة</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.9">
+        <div><i class="fa-solid fa-file-lines"></i> {{ doc.title }}</div>
+        <div style="font-family:monospace;font-size:10px;color:var(--text3)">{{ doc.archive_number or '—' }}</div>
+        {% if req %}
+        <div style="margin-top:6px">طلب من: <strong>{{ req.requester_name }}</strong></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="hint" id="pos-hint" style="display:none">
+      <i class="fa-solid fa-circle-check"></i> تم تحديد الموضع — يمكنك السحب لتغيير المكان فقط
+    </div>
+
+    <!-- زر التوقيع -->
+    <button class="confirm-btn" id="confirm-btn" onclick="confirmSign()">
+      <i class="fa-solid fa-circle-check"></i> توقيع الوثيقة الآن
+    </button>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DOC_ID  = {{ doc.id }};
+const REQ_ID  = {{ req.id if req else 'null' }};
+const PAGES   = {{ page_count }};
+const SIGNATURE_ASSETS = {{ signature_assets|tojson }};
+const STAMP_ASSETS = {{ stamp_assets|tojson }};
+const HAS_STAMP_ASSETS = STAMP_ASSETS.length > 0;
+let signatureAssetsView = Array.isArray(SIGNATURE_ASSETS) ? [...SIGNATURE_ASSETS] : [];
+let curPage   = 0;
+let signType  = HAS_STAMP_ASSETS ? 'both' : 'signature';
+let items     = []; // العناصر المضافة {type, x, y, w, h}
+let pageUnlocked = true;
+let unlockedSignPassword = '';
+let dragging  = null;
+let dragOff   = {x:0,y:0};
+let activePointerId = null;
+let canvasW   = 0, canvasH = 0;
+let selectedSignatureAssetId = {{ default_signature_asset_id if default_signature_asset_id is not none else 'null' }};
+let selectedStampAssetId = {{ default_stamp_asset_id|tojson if default_stamp_asset_id is not none else 'null' }};
+let selectedStampOwnerId = {{ default_stamp_owner_id if default_stamp_owner_id is not none else 'null' }};
+
+async function readJsonSafe(res){
+  const ct = (res.headers.get('content-type') || '').toLowerCase();
+  if(ct.includes('application/json')) return await res.json();
+  const raw = await res.text();
+  const msg = raw && !raw.startsWith('<!DOCTYPE') ? raw.slice(0, 180) : 'استجابة غير متوقعة من الخادم';
+  throw new Error(msg);
+}
+
+function setSignUiLocked(locked){
+  const layout = document.getElementById('sign-layout');
+  const lock = document.getElementById('sign-lock');
+  if(layout) layout.classList.toggle('locked', locked);
+  if(lock) lock.style.display = locked ? 'flex' : 'none';
+}
+
+function updateUnlockStatus(unlocked){
+  const box = document.getElementById('unlock-status');
+  if(!box) return;
+
+  if(unlocked){
+    box.classList.add('ok');
+    box.innerHTML = '<i class="fa-solid fa-lock-open"></i> تم التحقق من رقم التوقيع لهذه الصفحة، ويمكنك الآن توقيع الوثيقة مباشرة.';
+    return;
+  }
+
+  box.classList.remove('ok');
+  box.innerHTML = '<i class="fa-solid fa-lock"></i> أدخل رقم التوقيع مرة واحدة لفتح الصفحة، وبعدها يمكنك التوقيع مباشرة.';
+}
+
+async function unlockSignPage(){
+  const passInput = document.getElementById('unlock-pass');
+  const btn = document.getElementById('unlock-btn');
+  const pass = (passInput?.value || '').trim();
+
+  if(!pass) return toast('أدخل الرقم السري أولاً', 'error');
+
+  btn.disabled = true;
+  btn.textContent = 'جارٍ التحقق...';
+
+  try {
+    const res = await fetch('/api/signature/unlock', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+      body: JSON.stringify({sign_password: pass})
+    });
+    const data = await readJsonSafe(res);
+
+    if(res.ok && data.success){
+      pageUnlocked = true;
+      unlockedSignPassword = pass;
+      if(passInput) passInput.value = '';
+      setSignUiLocked(false);
+      updateUnlockStatus(true);
+      toast('تم فتح صفحة التوقيع');
+      setTimeout(()=>document.getElementById('confirm-btn')?.focus(), 120);
+      return;
+    }
+
+    toast(data.error || 'تعذر فتح الصفحة', 'error');
+  } catch (err) {
+    toast(err.message || 'فشل التحقق', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'فتح صفحة التوقيع';
+  }
+}
+
+// ─── تحميل صفحة PDF ──────────────────────────
+async function loadPage(n){
+  const res   = await fetch(`/api/documents/${DOC_ID}/preview?page=${n}`);
+  const blob  = await res.blob();
+  const url   = URL.createObjectURL(blob);
+  const img   = new window.Image();
+  img.onload  = ()=>{
+    const canvas = document.getElementById('pdf-canvas');
+    canvasW = img.width; canvasH = img.height;
+    canvas.width  = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    document.getElementById('cur-page').textContent = n+1;
+    document.getElementById('btn-prev').disabled = n===0;
+    document.getElementById('btn-next').disabled = n===PAGES-1;
+    renderItems();
+  };
+  img.src = url;
+}
+
+function prevPage(){ if(curPage>0){curPage--;loadPage(curPage);} }
+function nextPage(){ if(curPage<PAGES-1){curPage++;loadPage(curPage);} }
+
+function findSignatureAsset(id){
+  return signatureAssetsView.find(item => Number(item.asset_id) === Number(id));
+}
+
+function findSignatureAssetAny(id){
+  return (Array.isArray(SIGNATURE_ASSETS) ? SIGNATURE_ASSETS : []).find(item => Number(item.asset_id) === Number(id));
+}
+
+function findStampAsset(id){
+  return STAMP_ASSETS.find(item => String(item.asset_id) === String(id));
+}
+
+function visibilityScopeLabel(scope){
+  if(scope === 'managers') return 'المدراء والمدير العام فقط';
+  if(scope === 'self')     return 'لا أحد';
+  if(scope === 'specific') return 'مستخدم محدد';
+  return 'جميع المستخدمين';
+}
+
+function onSignatureOwnerChange(){
+  const select = document.getElementById('sig-owner-select');
+  selectedSignatureAssetId = Number(select.value);
+  const asset = findSignatureAsset(selectedSignatureAssetId);
+  const img = document.getElementById('sig-img-preview');
+  const meta = document.getElementById('sig-owner-meta');
+
+  if(asset && asset.signature_path){
+    img.src = `/static/${asset.signature_path}`;
+    img.style.display = '';
+    meta.textContent = `المالك: ${asset.name} — ${asset.signature_name || ('توقيع #' + asset.asset_id)} • الظهور: ${visibilityScopeLabel(asset.visibility_scope || 'self')}`;
+  } else {
+    img.removeAttribute('src');
+    img.style.display = 'none';
+    meta.textContent = 'لا يوجد توقيع متاح';
+  }
+}
+
+function onStampOwnerChange(){
+  const select = document.getElementById('stamp-owner-select');
+  selectedStampAssetId = select.value;
+  const asset = findStampAsset(selectedStampAssetId);
+  const box = document.getElementById('stamp-preview-box');
+  const meta = document.getElementById('stamp-owner-meta');
+  if(asset){
+    selectedStampOwnerId = Number(asset.owner_id);
+    const stampSrc = (asset.kind === 'image' && asset.stamp_path)
+      ? `/static/${asset.stamp_path}`
+      : `/api/stamp-preview?owner_id=${asset.owner_id}&mode=text`;
+    box.innerHTML = `<img src="${stampSrc}" style="width:100%;height:100%;object-fit:contain;border-radius:50%">`;
+    meta.textContent = `المالك: ${asset.name} — ${asset.stamp_name || 'ختم'} • الظهور: ${visibilityScopeLabel(asset.visibility_scope || 'self')}`;
+  } else {
+    selectedStampOwnerId = null;
+    box.textContent = '—';
+    meta.textContent = 'لا يوجد ختم لهذا المستخدم';
+  }
+}
+
+function renderSignatureOptions(){
+  const sigSelect = document.getElementById('sig-owner-select');
+  if(!sigSelect) return;
+
+  sigSelect.innerHTML = signatureAssetsView.map(item => {
+    const label = `${item.signature_name || ('توقيع #' + item.asset_id)} — ${item.name}`;
+    return `<option value="${item.asset_id}">${label}</option>`;
+  }).join('');
+
+  if(!signatureAssetsView.length){
+    sigSelect.innerHTML = '<option value="">لا توجد تواقيع متاحة</option>';
+    selectedSignatureAssetId = null;
+    const img = document.getElementById('sig-img-preview');
+    const meta = document.getElementById('sig-owner-meta');
+    if(img){ img.removeAttribute('src'); img.style.display = 'none'; }
+    if(meta) meta.textContent = 'لا توجد تواقيع متاحة حسب الإعدادات';
+    return;
+  }
+
+  const exists = signatureAssetsView.some(item => Number(item.asset_id) === Number(selectedSignatureAssetId));
+  if(!exists){
+    selectedSignatureAssetId = signatureAssetsView[0].asset_id;
+  }
+  sigSelect.value = String(selectedSignatureAssetId);
+  onSignatureOwnerChange();
+}
+
+function initAssetSelectors(){
+  renderSignatureOptions();
+
+  const stampSelect = document.getElementById('stamp-owner-select');
+  if(stampSelect){
+    stampSelect.innerHTML = STAMP_ASSETS.map(item => `<option value="${item.asset_id}">${item.stamp_name || 'ختم'} — ${item.name}</option>`).join('');
+    if(selectedStampAssetId === null && STAMP_ASSETS.length){
+      selectedStampAssetId = STAMP_ASSETS[0].asset_id;
+    }
+    if(selectedStampAssetId !== null){
+      stampSelect.value = String(selectedStampAssetId);
+      onStampOwnerChange();
+    }
+  }
+}
+
+// ─── أنواع التوقيع ─────────────────────────────
+function setType(t, btn){
+  document.querySelectorAll('.type-opt:not(.disabled)').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  signType = t;
+  const sigSection = document.getElementById('sig-section');
+  const stampSection = document.getElementById('stamp-section');
+  if(sigSection) sigSection.style.display = t!=='stamp'  ?'':'none';
+  if(stampSection) stampSection.style.display = (t!=='signature' && HAS_STAMP_ASSETS)?'':'none';
+}
+
+function upsertItem(newItem){
+  const targetPage = Number(newItem.page || 0);
+  const idx = items.findIndex(i => i.type === newItem.type && Number(i.page || 0) === targetPage);
+  if(idx > -1){
+    items[idx] = {...items[idx], ...newItem};
+  } else {
+    items.push(newItem);
+  }
+}
+
+// ─── أبعاد منطقة العمل ─────────────────────────
+function getWorkArea(){
+  return {w: canvasW||800, h: canvasH||1100};
+}
+
+function getCanvasScale(){
+  const canvas = document.getElementById('pdf-canvas');
+  const sx = canvas && canvasW ? (canvas.clientWidth / canvasW) : 1;
+  const sy = canvas && canvasH ? (canvas.clientHeight / canvasH) : 1;
+  return {
+    x: Number.isFinite(sx) && sx > 0 ? sx : 1,
+    y: Number.isFinite(sy) && sy > 0 ? sy : 1
+  };
+}
+
+// ─── إضافة التوقيع للصفحة ─────────────────────
+function addSigToCanvas(){
+  const asset = findSignatureAsset(selectedSignatureAssetId);
+  const img = document.getElementById('sig-img-preview');
+  if(!asset || !asset.signature_path) return toast('اختر توقيعًا صالحًا','error');
+  const wa = getWorkArea();
+  const w = Math.min(150, wa.w*0.25);
+  const ratio = (img && img.naturalWidth && img.naturalHeight) ? (img.naturalHeight / img.naturalWidth) : 0.35;
+  const h = Math.max(36, w * ratio);
+  upsertItem({
+    type:'sig', page:curPage,
+    x: wa.w*0.55, y: wa.h*0.78, w, h,
+    src: img ? img.src : `/static/${asset.signature_path}`,
+    ownerId:asset.owner_id, ownerName:asset.name, assetId:asset.asset_id
+  });
+  renderItems();
+  document.getElementById('pos-hint').style.display='';
+}
+
+function addStampToCanvas(){
+  const asset = findStampAsset(selectedStampAssetId);
+  if(!asset) return toast('اختر ختماً صالحاً','error');
+  const wa = getWorkArea();
+  const w = Math.min(280, wa.w*0.36), h = Math.min(280, wa.h*0.36);
+  const stampSrc = (asset.kind === 'image' && asset.stamp_path)
+    ? `/static/${asset.stamp_path}`
+    : `/api/stamp-preview?owner_id=${asset.owner_id}&mode=text`;
+  upsertItem({
+    type:'stamp', page:curPage,
+    x: wa.w*0.7, y: wa.h*0.76, w, h,
+    src:stampSrc, ownerId:asset.owner_id, ownerName:asset.name, assetId:asset.asset_id
+  });
+  renderItems();
+  document.getElementById('pos-hint').style.display='';
+}
+
+// ─── رسم العناصر ─────────────────────────────
+function renderItems(){
+  const wrap = document.getElementById('drag-items');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+
+  const visibleItems = items
+    .map((item, sourceIdx)=>({item, sourceIdx}))
+    .filter(entry => Number(entry.item.page || 0) === curPage);
+
+  visibleItems.forEach(({item, sourceIdx})=>{
+    const scale = getCanvasScale();
+    const el = document.createElement('div');
+    el.className = 'drop-item selected';
+    el.style.cssText = `left:${item.x * scale.x}px;top:${item.y * scale.y}px;width:${item.w * scale.x}px;height:${item.h * scale.y}px;`;
+    el.innerHTML = `<img src="${item.src}" style="width:100%;height:100%;object-fit:contain">
+      <div class="del-btn" onclick="removeItem(${sourceIdx})">×</div>`;
+    el.onpointerdown = (e)=>startDrag(e, sourceIdx);
+    el.ontouchstart = (e)=>{
+      if(e.target.classList.contains('del-btn')) return;
+      if(e.touches && e.touches[0]) startDragTouch(e.touches[0], sourceIdx);
+      e.preventDefault();
+    };
+    wrap.appendChild(el);
+  });
+}
+
+function removeItem(idx){ items.splice(idx,1); renderItems(); }
+
+// ─── Drag ─────────────────────────────────────
+function pointerPosInCanvas(e){
+  const canvasWrap = document.getElementById('pdf-canvas-wrap');
+  if(!canvasWrap) return {x:e.clientX,y:e.clientY};
+  const rect = canvasWrap.getBoundingClientRect();
+  const scale = getCanvasScale();
+  return {
+    x: (e.clientX - rect.left) / scale.x,
+    y: (e.clientY - rect.top) / scale.y
+  };
+}
+
+function startDrag(e, idx){
+  if(e.target.classList.contains('del-btn')) return;
+  e.preventDefault();
+  if(typeof e.pointerId === 'number'){
+    activePointerId = e.pointerId;
+    if(typeof e.target.setPointerCapture === 'function'){
+      e.target.setPointerCapture(e.pointerId);
+    }
+  }
+  const pos = pointerPosInCanvas(e);
+  dragging = {idx, type:'drag'};
+  dragOff  = {x: pos.x - items[idx].x, y: pos.y - items[idx].y};
+}
+
+function startDragTouch(touch, idx){
+  const pseudoEvent = {
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+    preventDefault: ()=>{}
+  };
+  dragging = {idx, type:'drag'};
+  activePointerId = null;
+  const pos = pointerPosInCanvas(pseudoEvent);
+  dragOff = {x: pos.x - items[idx].x, y: pos.y - items[idx].y};
+}
+
+document.addEventListener('pointermove', e=>{
+  if(activePointerId !== null && e.pointerId !== activePointerId) return;
+  if(!dragging) return;
+  e.preventDefault();
+  const {idx} = dragging;
+  const pos = pointerPosInCanvas(e);
+  const wa = getWorkArea();
+  items[idx].x = Math.max(0, Math.min(wa.w - items[idx].w, pos.x - dragOff.x));
+  items[idx].y = Math.max(0, Math.min(wa.h - items[idx].h, pos.y - dragOff.y));
+  renderItems();
+}, {passive:false});
+
+function stopDrag(){
+  dragging = null;
+  activePointerId = null;
+}
+
+document.addEventListener('pointerup', stopDrag);
+document.addEventListener('pointercancel', stopDrag);
+
+document.addEventListener('touchmove', e=>{
+  if(!dragging || !e.touches || !e.touches.length) return;
+  const touch = e.touches[0];
+  const pseudoEvent = {clientX: touch.clientX, clientY: touch.clientY};
+  const pos = pointerPosInCanvas(pseudoEvent);
+  const {idx} = dragging;
+  const wa = getWorkArea();
+  items[idx].x = Math.max(0, Math.min(wa.w - items[idx].w, pos.x - dragOff.x));
+  items[idx].y = Math.max(0, Math.min(wa.h - items[idx].h, pos.y - dragOff.y));
+  renderItems();
+  e.preventDefault();
+}, {passive:false});
+
+document.addEventListener('touchend', stopDrag);
+document.addEventListener('touchcancel', stopDrag);
+
+
+// ─── تأكيد التوقيع ───────────────────────────
+async function confirmSign(){
+  const pass = '';
+  const wa = getWorkArea();
+
+  const pageItems = items.filter(item => Number(item.page || 0) === curPage);
+  if(!pageItems.length) return toast('أضف التوقيع أو الختم على الصفحة أولاً','error');
+
+  const sigItem   = pageItems.find(item => item.type === 'sig');
+  const stampItem = pageItems.find(item => item.type === 'stamp');
+  const signatureAssetId  = sigItem?.assetId ?? selectedSignatureAssetId;
+  const signatureOwnerId  = sigItem?.ownerId ?? findSignatureAsset(signatureAssetId)?.owner_id ?? null;
+  const stampOwnerId  = stampItem?.ownerId ?? selectedStampOwnerId;
+  const stampAssetId  = stampItem?.assetId ?? selectedStampAssetId;
+  const includeQrInput    = document.getElementById('include-qr');
+  const includeQrEnabled  = includeQrInput ? !!includeQrInput.checked : false;
+
+  if((signType === 'signature' || signType === 'both') && !signatureAssetId){
+    return toast('اختر توقيعاً من النظام أولاً','error');
+  }
+  if((signType === 'stamp' || signType === 'both') && (!stampOwnerId || !stampAssetId)){
+    return toast('اختر ختماً من النظام أولاً','error');
+  }
+
+  const btn = document.getElementById('confirm-btn');
+  btn.disabled=true; btn.textContent='جارٍ التوقيع...';
+
+  // حساب النسب — نحمي من قسمة على صفر
+  const refW = wa.w || 800;
+  const refH = wa.h || 1100;
+  const positions = pageItems.map(item=>({
+    type: item.type,
+    x:    Math.min(1, Math.max(0, item.x / refW)),
+    y:    Math.min(1, Math.max(0, item.y / refH)),
+    w:    Math.min(1, Math.max(0.05, item.w / refW)),
+    h:    Math.min(1, Math.max(0.05, item.h / refH)),
+    page: Number(item.page || curPage)
+  }));
+
+  try {
+    const res = await fetch(`/api/signature-request/${REQ_ID||'direct'}/sign-pdf`,{
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+      body: JSON.stringify({
+        sign_password: pass,
+        sign_type:     signType,
+        signature_asset_id: signatureAssetId,
+        signature_owner_id: signatureOwnerId,
+        stamp_owner_id: stampOwnerId,
+        stamp_asset_id: stampAssetId,
+        include_qr: includeQrEnabled,
+        positions,
+        doc_id:        DOC_ID,
+        page:          curPage
+      })
+    });
+    const data = await readJsonSafe(res);
+    btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-check"></i> توقيع الوثيقة الآن';
+
+    if(res.ok && data.success){
+    unlockedSignPassword = '';
+    const includeQrOnDocument = data.include_qr !== false;
+    if(data.warning){
+      toast(`${data.warning}`,'error');
+    }
+    // عرض النتيجة
+    document.querySelector('.sign-layout').innerHTML = `
+      <div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;text-align:center">
+        <div style="font-size:64px;margin-bottom:20px"><i class="fa-solid fa-circle-check"></i></div>
+        <h2 style="font-size:22px;font-weight:700;margin-bottom:8px">تم التوقيع بنجاح</h2>
+        <p style="color:var(--text2);font-size:14px;margin-bottom:24px">
+          الرقم التسلسلي: <strong style="color:var(--green);font-family:monospace">${data.serial}</strong>
+        </p>
+        ${includeQrOnDocument ? `
+        <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:20px 32px;margin-bottom:24px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px">امسح للتحقق من الوثيقة</div>
+          <img src="/api/qr/${data.serial}" style="width:120px;height:120px;border-radius:8px">
+        </div>
+        ` : `
+        <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;margin-bottom:24px;font-size:12px;color:var(--text2)">
+          <i class="fa-solid fa-circle-info"></i> تم التوقيع بدون تضمين QR داخل المستند حسب اختيارك.
+        </div>
+        `}
+        <div style="display:flex;gap:10px">
+          <a href="/documents" class="btn-primary"><i class="fa-solid fa-arrow-left-long"></i> الوثائق</a>
+          <a href="/api/documents/${DOC_ID}/download-signed" class="btn-primary" style="background:linear-gradient(135deg,#065f46,#059669)"><i class="fa-solid fa-download"></i> تحميل الملف الموقع</a>
+        </div>
+      </div>`;
+    } else {
+      toast(data.error||'فشل التوقيع','error');
+    }
+  } catch (err) {
+    btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-check"></i> توقيع الوثيقة الآن';
+    toast(err.message || 'تعذر إكمال العملية','error');
+  }
+}
+
+initAssetSelectors();
+const initialTypeBtn = document.querySelector(`.type-opt[data-type="${signType}"]`) || document.querySelector('.type-opt[data-type="signature"]');
+if(initialTypeBtn){
+  setType(signType, initialTypeBtn);
+}
+loadPage(0);
+</script>
+{% endblock %}

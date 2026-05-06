@@ -1,0 +1,480 @@
+{% extends "base.html" %}
+{% block title %}إدارة المستخدمين{% endblock %}
+{% block page_title %}إدارة المستخدمين{% endblock %}
+{% block page_sub %}إنشاء وتعديل وإدارة حسابات النظام{% endblock %}
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openModal('new-modal')"><i class="fa-solid fa-user-plus"></i> مستخدم جديد</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.users-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.users-filters input{flex:1;min-width:220px;width:auto !important}
+.users-filters select{min-width:170px}
+.user-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+@media (max-width:760px){
+  .users-filters > *{width:100%}
+  .users-filters select{min-width:0}
+  .user-form-grid{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- فلتر -->
+<div class="users-filters">
+  <input id="search" placeholder="بحث بالاسم أو البريد..." oninput="renderUsers()"
+    style="background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;width:260px;direction:rtl">
+  <select id="role-filter" onchange="renderUsers()"
+    style="background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;cursor:pointer">
+    <option value="">كل الأدوار</option>
+    <option value="admin">مدير عام</option>
+    <option value="manager">مدير</option>
+    <option value="user">موظف</option>
+  </select>
+  <select id="section-filter" onchange="renderUsers()"
+    style="background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;cursor:pointer">
+    <option value="">كل الأقسام</option>
+  </select>
+  <button class="btn-ghost" onclick="openSectionModal('new')"><i class="fa-solid fa-folder-plus"></i> قسم جديد</button>
+</div>
+
+<!-- جدول -->
+<div class="table-wrap">
+  <div class="table-head">
+    <div class="table-title"><i class="fa-solid fa-users"></i> المستخدمون</div>
+    <div id="users-count" style="font-size:12px;color:var(--text3)"></div>
+  </div>
+  <div id="users-table">
+    <div class="empty"><div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><div class="empty-text">جارٍ التحميل...</div></div>
+  </div>
+</div>
+
+<!-- Modal إضافة -->
+<div class="modal-overlay" id="new-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-user-plus"></i> مستخدم جديد</div>
+    <div class="user-form-grid">
+      <div class="mfield" style="grid-column:1/-1">
+        <label>الاسم الكامل</label>
+        <input type="text" id="n-name" placeholder="محمد أحمد العمري">
+      </div>
+      <div class="mfield">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="n-email" placeholder="name@company.sa">
+      </div>
+      <div class="mfield">
+        <label>رقم الجوال</label>
+        <input type="text" id="n-phone" placeholder="+966500000000">
+      </div>
+      <div class="mfield">
+        <label>المسمى الوظيفي</label>
+        <input type="text" id="n-job" placeholder="مدير المشتريات">
+      </div>
+      <div class="mfield">
+        <label>الرقم الوظيفي</label>
+        <input type="text" id="n-empid" placeholder="EMP-001" style="direction:ltr">
+      </div>
+      <div class="mfield">
+        <label>الدور</label>
+        <select id="n-role">
+          <option value="user">موظف</option>
+          <option value="manager">مدير</option>
+          <option value="admin">مدير عام</option>
+          <option value="sys_admin">ادمن</option>
+        </select>
+      </div>
+      <div class="mfield">
+        <label>القسم الرئيسي</label>
+        <div style="display:flex;gap:6px">
+          <select id="n-section" style="flex:1"></select>
+          <button type="button" class="btn-ghost" onclick="openSectionModal('new')"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </div>
+      <div class="mfield" id="stamp-field" style="grid-column:1/-1;display:none">
+        <label>نص الختم الرسمي</label>
+        <input type="text" id="n-stamp" placeholder="مدير المبيعات — شركة النجم">
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:10px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px"><i class="fa-solid fa-shield-halved"></i> صلاحيات الأقسام الإضافية</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">عند اختيار دور مدير/مدير عام/ادمن وتفعيل خيار <strong>ختم باسم القسم</strong>، يتم إنشاء ختم تلقائي لكل قسم مفعّل.</div>
+      <div id="n-section-perms-list" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div style="background:var(--gold-dim);border:1px solid rgba(232,168,48,.2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--gold);margin-top:8px">
+      <i class="fa-solid fa-envelope"></i> سيُرسل الباسورد المؤقت تلقائياً لبريد المستخدم
+    </div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('new-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="createUser()">إنشاء الحساب</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تعديل -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-user-pen"></i> تعديل المستخدم</div>
+    <input type="hidden" id="e-id">
+    <div class="user-form-grid">
+      <div class="mfield" style="grid-column:1/-1">
+        <label>الاسم الكامل</label>
+        <input type="text" id="e-name">
+      </div>
+      <div class="mfield">
+        <label>رقم الجوال</label>
+        <input type="text" id="e-phone">
+      </div>
+      <div class="mfield">
+        <label>المسمى الوظيفي</label>
+        <input type="text" id="e-job">
+      </div>
+      <div class="mfield">
+        <label>الرقم الوظيفي</label>
+        <input type="text" id="e-empid" style="direction:ltr" placeholder="EMP-001">
+      </div>
+      <div class="mfield">
+        <label>الدور</label>
+        <select id="e-role">
+          <option value="user">موظف</option>
+          <option value="manager">مدير</option>
+          <option value="admin">مدير عام</option>
+          <option value="sys_admin">ادمن</option>
+        </select>
+      </div>
+      <div class="mfield">
+        <label>القسم الرئيسي</label>
+        <div style="display:flex;gap:6px">
+          <select id="e-section" style="flex:1"></select>
+          <button type="button" class="btn-ghost" onclick="openSectionModal('edit')"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </div>
+      <div class="mfield" style="grid-column:1/-1">
+        <label>نص الختم (اتركه فارغاً إذا لا يوجد ختم)</label>
+        <input type="text" id="e-stamp" placeholder="مدير المبيعات — شركة النجم">
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:10px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px"><i class="fa-solid fa-shield-halved"></i> صلاحيات الأقسام الإضافية</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">يمكنك إسناد أكثر من قسم لنفس المدير، وسيتم تحديث الأختام التلقائية حسب الأقسام المفعّلة.</div>
+      <div id="e-section-perms-list" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('edit-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveEdit()"><i class="fa-solid fa-floppy-disk"></i> حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal قسم جديد -->
+<div class="modal-overlay" id="section-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title"><i class="fa-solid fa-folder-plus"></i> قسم جديد</div>
+    <div class="mfield">
+      <label>اسم القسم</label>
+      <input type="text" id="s-name" placeholder="مثال: الموارد البشرية">
+    </div>
+    <div class="mfield">
+      <label>اختصار القسم</label>
+      <input type="text" id="s-code" placeholder="HR" maxlength="2" style="direction:ltr;text-transform:uppercase">
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px">سيُستخدم الاختصار مباشرة في أرقام الأرشيف مثل HR01</div>
+    <div class="mactions">
+      <button class="btn-ghost" onclick="closeModal('section-modal')">إلغاء</button>
+      <button class="btn-primary" onclick="createSection()">إنشاء القسم</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allUsers = [];
+let allSections = [];
+let currentSectionTarget = 'new';
+
+const roleMap  = {admin:'badge-admin',manager:'badge-manager',user:'badge-user',sys_admin:'badge-manager'};
+const roleLabel= {admin:'مدير عام',manager:'مدير',user:'موظف',sys_admin:'ادمن'};
+
+async function loadUsers(){
+  const [usersRes, sectionsRes] = await Promise.all([
+    fetch('/api/users'),
+    fetch('/api/archive-sections')
+  ]);
+  allUsers  = await usersRes.json();
+  allSections = sectionsRes.ok ? await sectionsRes.json() : [];
+  renderSectionOptions();
+  document.getElementById('users-count').textContent = `${allUsers.length} مستخدم`;
+  renderUsers();
+}
+
+function renderSectionOptions(newSelected='', editSelected=''){
+  const targets = [
+    {id:'n-section', selected:newSelected},
+    {id:'e-section', selected:editSelected},
+    {id:'section-filter', selected:document.getElementById('section-filter')?.value || ''}
+  ];
+
+  targets.forEach(target => {
+    const el = document.getElementById(target.id);
+    if(!el) return;
+    const isFilter = target.id === 'section-filter';
+    const currentValue = String(target.selected || '');
+    el.innerHTML = isFilter ? '<option value="">كل الأقسام</option>' : '<option value="">اختر القسم</option>';
+    allSections.forEach(section => {
+      const option = document.createElement('option');
+      option.value = String(section.id);
+      option.textContent = `${section.section_name} (${section.section_code})`;
+      if(String(section.id) === currentValue) option.selected = true;
+      el.appendChild(option);
+    });
+  });
+  renderNewSectionPerms();
+}
+
+function openSectionModal(target='new'){
+  currentSectionTarget = target;
+  document.getElementById('s-name').value = '';
+  document.getElementById('s-code').value = '';
+  openModal('section-modal');
+}
+
+async function createSection(){
+  const body = {
+    section_name: document.getElementById('s-name').value.trim(),
+    section_code: document.getElementById('s-code').value.trim().toUpperCase()
+  };
+  if(!body.section_name || !/^[A-Za-z]{2}$/.test(body.section_code)){
+    return toast('أدخل اسم القسم واختصار من حرفين إنجليزيين','error');
+  }
+
+  const res = await fetch('/api/archive-sections', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if(!res.ok || !data.success){
+    return toast(data.error || 'فشل إنشاء القسم','error');
+  }
+
+  allSections.push(data.section);
+  allSections.sort((a,b)=> String(a.section_name||'').localeCompare(String(b.section_name||''), 'ar'));
+  const selectedId = String(data.section.id);
+  renderSectionOptions(currentSectionTarget === 'new' ? selectedId : '', currentSectionTarget === 'edit' ? selectedId : '');
+  closeModal('section-modal');
+  toast(`تم إنشاء القسم ${data.section.section_name}`);
+}
+
+function renderUsers(){
+  const q    = document.getElementById('search').value.toLowerCase();
+  const role = document.getElementById('role-filter').value;
+  const sectionId = document.getElementById('section-filter').value;
+  const list = allUsers.filter(u=>
+    (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || String(u.archive_section||'').toLowerCase().includes(q) || String(u.archive_section_code||'').toLowerCase().includes(q)) &&
+    (!role || u.role===role) &&
+    (!sectionId || String(u.archive_section_id || '') === String(sectionId))
+  );
+  const el = document.getElementById('users-table');
+  if(!list.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><div class="empty-text">لا توجد نتائج</div></div>';
+    return;
+  }
+  el.innerHTML=`<table>
+    <thead><tr><th>المستخدم</th><th>الرقم الوظيفي</th><th>الدور</th><th>القسم</th><th>الجوال</th><th>المسمى</th><th>الختم</th><th>الحالة</th><th></th></tr></thead>
+    <tbody>${list.map(u=>`<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#b7791f);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${u.name[0]}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px">${u.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${u.email}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;font-family:monospace;color:var(--text2)">${u.employee_id||'—'}</td>
+      <td><span class="badge ${roleMap[u.role]}">${roleLabel[u.role]}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${u.archive_section||'—'} <span style="direction:ltr;font-family:monospace">(${u.archive_section_code||'GN'})</span></td>
+      <td style="font-size:12px;color:var(--text2);direction:ltr">${u.phone||'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${u.job_title||'—'}</td>
+      <td>${u.stamp_text?`<span style="font-size:11px;color:var(--gold)"><i class="fa-solid fa-stamp"></i> ${u.stamp_text}</span>`:'<span style="color:var(--text3);font-size:11px">لا يوجد</span>'}</td>
+      <td><span class="badge ${u.is_active?'badge-approved':'badge-rejected'}">${u.is_active?'نشط':'موقوف'}</span></td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn-ghost" onclick='editUser(${JSON.stringify(u)})'>تعديل</button>
+          ${u.is_active ? `<button class="btn-danger" onclick="deactivateUser(${u.id},${JSON.stringify(u.name)})">إيقاف</button>` : ''}
+          <button class="btn-danger" style="background:#7f1d1d" onclick="permanentDeleteUser(${u.id},${JSON.stringify(u.name)})">حذف نهائي</button>
+        </div>
+      </td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+
+// إظهار حقل الختم لو المدير
+document.getElementById('n-role').addEventListener('change',function(){
+  document.getElementById('stamp-field').style.display=this.value==='user'?'none':'block';
+});
+
+function renderNewSectionPerms(){
+  const listEl = document.getElementById('n-section-perms-list');
+  if(!listEl) return;
+  if(!allSections.length){
+    listEl.innerHTML = '<div style="font-size:11px;color:var(--text3)">لا توجد أقسام</div>';
+    return;
+  }
+  listEl.innerHTML = allSections.map(s => `
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="flex:1;font-weight:500">${s.section_name} <span style="font-family:monospace;font-size:10px;color:var(--accent)">(${s.section_code})</span></div>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="nperm-view-${s.id}">
+        مشاهدة الأرشيف
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="nperm-stamp-${s.id}">
+        ختم باسم القسم
+      </label>
+    </div>
+  `).join('');
+}
+
+async function createUser(){
+  const sectionPermissions = allSections.map(s => ({
+    section_id: s.id,
+    can_view_archive: document.getElementById(`nperm-view-${s.id}`)?.checked ? 1 : 0,
+    can_stamp: document.getElementById(`nperm-stamp-${s.id}`)?.checked ? 1 : 0
+  })).filter(p => p.can_view_archive || p.can_stamp);
+
+  const body={
+    name:  document.getElementById('n-name').value.trim(),
+    email: document.getElementById('n-email').value.trim(),
+    phone: document.getElementById('n-phone').value.trim(),
+    job_title: document.getElementById('n-job').value.trim(),
+    employee_id: document.getElementById('n-empid').value.trim(),
+    role:  document.getElementById('n-role').value,
+    archive_section_id: document.getElementById('n-section').value,
+    stamp_text: document.getElementById('n-stamp').value.trim(),
+    section_permissions: sectionPermissions
+  };
+  if(!body.name||!body.email||!body.phone) return toast('أدخل جميع الحقول المطلوبة','error');
+  const res  = await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data = await res.json();
+  if(data.success){
+    closeModal('new-modal');
+    toast(data.message);
+    ['n-name','n-email','n-phone','n-job','n-empid','n-stamp'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('n-section').value='';
+    // reset checkboxes
+    allSections.forEach(s=>{
+      const v=document.getElementById(`nperm-view-${s.id}`);
+      const t=document.getElementById(`nperm-stamp-${s.id}`);
+      if(v) v.checked=false;
+      if(t) t.checked=false;
+    });
+    loadUsers();
+  } else toast(data.error||'فشل الإنشاء','error');
+}
+
+function editUser(u){
+  document.getElementById('e-id').value   = u.id;
+  document.getElementById('e-name').value = u.name;
+  document.getElementById('e-phone').value= u.phone||'';
+  document.getElementById('e-job').value  = u.job_title||'';
+  document.getElementById('e-empid').value= u.employee_id||'';
+  document.getElementById('e-role').value = u.role;
+  renderSectionOptions('', String(u.archive_section_id || ''));
+  document.getElementById('e-section').value = String(u.archive_section_id || '');
+  document.getElementById('e-stamp').value= u.stamp_text||'';
+  loadSectionPerms(u.id);
+  openModal('edit-modal');
+}
+
+let currentUserPerms = {}; // section_id → {can_view_archive, can_stamp}
+
+async function loadSectionPerms(uid){
+  const listEl = document.getElementById('e-section-perms-list');
+  listEl.innerHTML = '<div style="font-size:11px;color:var(--text3)">جارٍ التحميل...</div>';
+  currentUserPerms = {};
+  try {
+    const res = await fetch(`/api/users/${uid}/section-perms`);
+    const data = await res.json();
+    if(data.success){
+      (data.permissions||[]).forEach(p => {
+        currentUserPerms[String(p.section_id)] = {
+          can_view_archive: !!p.can_view_archive,
+          can_stamp: !!p.can_stamp
+        };
+      });
+    }
+  } catch(e){}
+  renderSectionPerms();
+}
+
+function renderSectionPerms(){
+  const listEl = document.getElementById('e-section-perms-list');
+  if(!allSections.length){
+    listEl.innerHTML = '<div style="font-size:11px;color:var(--text3)">لا توجد أقسام</div>';
+    return;
+  }
+  listEl.innerHTML = allSections.map(s => {
+    const sid = String(s.id);
+    const p = currentUserPerms[sid] || {can_view_archive:false, can_stamp:false};
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="flex:1;font-weight:500">${s.section_name} <span style="font-family:monospace;font-size:10px;color:var(--accent)">(${s.section_code})</span></div>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="perm-view-${sid}" ${p.can_view_archive?'checked':''}>
+        مشاهدة الأرشيف
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="perm-stamp-${sid}" ${p.can_stamp?'checked':''}>
+        ختم باسم القسم
+      </label>
+    </div>`;
+  }).join('');
+}
+
+async function saveEdit(){
+  const id = document.getElementById('e-id').value;
+  const permissions = allSections.map(s => ({
+    section_id: s.id,
+    can_view_archive: document.getElementById(`perm-view-${s.id}`)?.checked ? 1 : 0,
+    can_stamp: document.getElementById(`perm-stamp-${s.id}`)?.checked ? 1 : 0
+  })).filter(p => p.can_view_archive || p.can_stamp);
+
+  const body={
+    name:  document.getElementById('e-name').value.trim(),
+    phone: document.getElementById('e-phone').value.trim(),
+    job_title: document.getElementById('e-job').value.trim(),
+    employee_id: document.getElementById('e-empid').value.trim(),
+    role:  document.getElementById('e-role').value,
+    archive_section_id: document.getElementById('e-section').value,
+    stamp_text: document.getElementById('e-stamp').value.trim(),
+    section_permissions: permissions
+  };
+  const res = await fetch(`/api/users/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data = await res.json();
+  if(data.success){ closeModal('edit-modal'); toast('تم الحفظ'); loadUsers(); }
+  else toast('فشل الحفظ','error');
+}
+
+async function deactivateUser(id, name){
+  if(!confirm(`إيقاف ${name}؟ لن يتمكن من الدخول.`)) return;
+  const res  = await fetch(`/api/users/${id}`,{method:'DELETE'});
+  const data = await res.json();
+  if(data.success){ toast('تم إيقاف المستخدم'); loadUsers(); }
+  else toast(data.error||'فشل الإيقاف','error');
+}
+
+async function permanentDeleteUser(id, name){
+  if(!confirm(`حذف ${name} نهائياً من قاعدة البيانات؟ هذا الإجراء لا يمكن التراجع عنه.`)) return;
+  const res  = await fetch(`/api/users/${id}/permanent-delete`,{method:'DELETE'});
+  const data = await res.json();
+  if(data.success){ toast('تم الحذف النهائي'); loadUsers(); }
+  else toast(data.error||'فشل الحذف النهائي','error');
+}
+
+loadUsers();
+</script>
+{% endblock %}
