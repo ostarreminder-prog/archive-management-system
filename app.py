@@ -3678,10 +3678,12 @@ def _get_stamp_assets(conn, viewer_id=None, viewer_role=''):
         visible_to_uid = _safe_int(row.get('stamp_visible_to_user_id'), 0)
         if not _stamp_visible(scope, visible_to_uid, owner_id):
             continue
+        # Use actual stamp text content for better identification in dropdown
+        stamp_text_content = row['stamp_text'] or 'ختم المدير'
         assets.append({
             'asset_id': f"text-{owner_id}",
             'owner_id': owner_id,
-            'stamp_name': 'ختم المدير',
+            'stamp_name': stamp_text_content,
             'stamp_path': None,
             'visibility_scope': scope,
             'visible_to_user_id': visible_to_uid if visible_to_uid > 0 else None,

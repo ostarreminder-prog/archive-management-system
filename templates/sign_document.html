@@ -418,7 +418,11 @@ function initAssetSelectors(){
 
   const stampSelect = document.getElementById('stamp-owner-select');
   if(stampSelect){
-    stampSelect.innerHTML = STAMP_ASSETS.map(item => `<option value="${item.asset_id}">${item.stamp_name || 'ختم'} — ${item.name}</option>`).join('');
+    stampSelect.innerHTML = STAMP_ASSETS.map(item => {
+      const icon = item.kind === 'text' ? '📝' : '🖼️';
+      const label = item.stamp_name || 'ختم';
+      return `<option value="${item.asset_id}">${icon} ${label} — ${item.name}</option>`;
+    }).join('');
     if(selectedStampAssetId === null && STAMP_ASSETS.length){
       selectedStampAssetId = STAMP_ASSETS[0].asset_id;
     }
