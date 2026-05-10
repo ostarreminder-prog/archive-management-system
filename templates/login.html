@@ -209,6 +209,78 @@ body::before {
   animation: fadeIn .2s ease;
 }
 
+/* register card */
+.register-wrap {
+  display: none;
+}
+.register-wrap.active {
+  display: block;
+  animation: fadeIn .3s ease;
+}
+.login-card-wrap {
+  display: block;
+}
+.login-card-wrap.hidden {
+  display: none;
+}
+
+.field select {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 16px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 15px;
+  outline: none;
+  direction: rtl;
+  transition: border-color .2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239a7358' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 14px center;
+}
+.field select:focus { border-color: var(--accent); }
+
+.reg-divider {
+  text-align: center;
+  margin: 18px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reg-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pass-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.strength-bar {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--border);
+  margin-top: 6px;
+  overflow: hidden;
+}
+.strength-fill {
+  height: 100%;
+  border-radius: 4px;
+  width: 0%;
+  transition: width .3s, background .3s;
+}
+
+@media (max-width:640px){
+  .reg-row { grid-template-columns: 1fr; }
+}
+
 /* OTP inputs */
 .otp-wrap {
   display: flex;
@@ -321,10 +393,12 @@ body::before {
 <div class="login-wrap">
 
   <div class="logo">
-    <h1>نجم</h1>
+    <h1>SignMy</h1>
     <p>by نجوم العمران </p>
   </div>
 
+  <!-- ════ LOGIN CARD ════ -->
+  <div class="login-card-wrap" id="login-card-wrap">
   <div class="card">
 
     <!-- Progress -->
@@ -442,7 +516,105 @@ body::before {
     </div>
 
   </div>
-</div>
+
+  <!-- رابط الانتقال إلى التسجيل -->
+  <div style="text-align:center; margin-top:18px;">
+    <span style="font-size:13px; color:var(--muted);">موظف جديد ولا يوجد لديك حساب؟</span>
+    <button class="text-btn" style="display:inline;width:auto;margin:0 4px;" onclick="showRegister()">سجّل نفسك</button>
+  </div>
+  </div><!-- /login-card-wrap -->
+
+  <!-- ════ REGISTER CARD ════ -->
+  <div class="register-wrap" id="register-wrap">
+  <div class="card">
+    <div class="step-title">تسجيل موظف جديد</div>
+    <div class="step-sub">أدخل بياناتك الوظيفية — سيتم إنشاء حسابك بدور موظف تلقائياً</div>
+
+    <div class="error-msg" id="reg-error-msg"></div>
+
+    <!-- الاسم -->
+    <div class="field">
+      <label>الاسم الكامل <span style="color:var(--red)">*</span></label>
+      <input type="text" id="reg-name" placeholder="محمد أحمد العتيبي" maxlength="100">
+    </div>
+
+    <!-- البريد + الجوال -->
+    <div class="reg-row">
+      <div class="field">
+        <label>البريد الإلكتروني <span style="color:var(--red)">*</span></label>
+        <input type="email" id="reg-email" placeholder="example@company.com">
+      </div>
+      <div class="field">
+        <label>رقم الجوال <span style="color:var(--red)">*</span></label>
+        <input type="tel" id="reg-phone" placeholder="05xxxxxxxx" maxlength="20">
+      </div>
+    </div>
+
+    <!-- المسمى الوظيفي + الرقم الوظيفي -->
+    <div class="reg-row">
+      <div class="field">
+        <label>المسمى الوظيفي</label>
+        <input type="text" id="reg-jobtitle" placeholder="مدير / محاسب / ..." maxlength="100">
+      </div>
+      <div class="field">
+        <label>الرقم الوظيفي</label>
+        <input type="text" id="reg-empid" placeholder="EMP-001" maxlength="50">
+      </div>
+    </div>
+
+    <!-- القسم -->
+    <div class="field">
+      <label>القسم <span style="color:var(--red)">*</span></label>
+      <select id="reg-section">
+        <option value="">— جارٍ التحميل —</option>
+      </select>
+    </div>
+
+    <div class="reg-divider">— كلمة المرور —</div>
+
+    <!-- كلمة المرور -->
+    <div class="field">
+      <label>كلمة المرور <span style="color:var(--red)">*</span></label>
+      <div class="password-wrap">
+        <input type="password" id="reg-pass" placeholder="••••••••" oninput="updateStrength()" maxlength="128">
+        <button type="button" class="pass-toggle" onclick="togglePassword('reg-pass', this)" aria-label="إظهار كلمة المرور" title="إظهار كلمة المرور">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1.5 12s3.8-6.5 10.5-6.5S22.5 12 22.5 12s-3.8 6.5-10.5 6.5S1.5 12 1.5 12Z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+      <div class="pass-hint">8 أحرف على الأقل، تشمل حرفاً كبيراً ورقماً</div>
+    </div>
+
+    <!-- تأكيد كلمة المرور -->
+    <div class="field">
+      <label>تأكيد كلمة المرور <span style="color:var(--red)">*</span></label>
+      <div class="password-wrap">
+        <input type="password" id="reg-confirm" placeholder="••••••••" maxlength="128"
+               onkeydown="if(event.key==='Enter') submitRegister()">
+        <button type="button" class="pass-toggle" onclick="togglePassword('reg-confirm', this)" aria-label="إظهار كلمة المرور" title="إظهار كلمة المرور">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1.5 12s3.8-6.5 10.5-6.5S22.5 12 22.5 12s-3.8 6.5-10.5 6.5S1.5 12 1.5 12Z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn" id="reg-btn" onclick="submitRegister()">
+      <i class="fa-solid fa-user-plus"></i> إنشاء الحساب
+    </button>
+  </div>
+
+  <div style="text-align:center; margin-top:18px;">
+    <span style="font-size:13px; color:var(--muted);">لديك حساب بالفعل؟</span>
+    <button class="text-btn" style="display:inline;width:auto;margin:0 4px;" onclick="showLogin()">تسجيل الدخول</button>
+  </div>
+  </div><!-- /register-wrap -->
+
+</div><!-- /login-wrap -->
 
 <script>
 let timerInterval;
@@ -709,6 +881,138 @@ function showSuccess(msg) {
 function hideError() {
   document.getElementById('error-msg').classList.remove('show', 'success');
 }
+
+// ════ REGISTER ════════════════════════════════
+function showRegister() {
+  document.getElementById('login-card-wrap').classList.add('hidden');
+  document.getElementById('register-wrap').classList.add('active');
+  loadSections();
+  document.getElementById('reg-name').focus();
+}
+
+function showLogin() {
+  document.getElementById('register-wrap').classList.remove('active');
+  document.getElementById('login-card-wrap').classList.remove('hidden');
+  hideRegError();
+}
+
+function showRegError(msg) {
+  const el = document.getElementById('reg-error-msg');
+  el.textContent = msg;
+  el.classList.remove('success');
+  el.classList.add('show');
+}
+
+function showRegSuccess(msg) {
+  const el = document.getElementById('reg-error-msg');
+  el.textContent = msg;
+  el.classList.remove('show');
+  el.classList.add('show', 'success');
+}
+
+function hideRegError() {
+  document.getElementById('reg-error-msg').classList.remove('show', 'success');
+}
+
+let sectionsLoaded = false;
+async function loadSections() {
+  if (sectionsLoaded) return;
+  try {
+    const res  = await fetch('/api/register/sections');
+    const data = await res.json();
+    const sel  = document.getElementById('reg-section');
+    sel.innerHTML = '<option value="">— اختر القسم —</option>';
+    if (data.success && data.sections && data.sections.length) {
+      data.sections.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `${s.section_name} (${s.section_code})`;
+        sel.appendChild(opt);
+      });
+      sectionsLoaded = true;
+    } else {
+      sel.innerHTML = '<option value="">لا توجد أقسام نشطة</option>';
+    }
+  } catch (e) {
+    document.getElementById('reg-section').innerHTML = '<option value="">تعذر تحميل الأقسام</option>';
+  }
+}
+
+function updateStrength() {
+  const pass = document.getElementById('reg-pass').value;
+  const fill = document.getElementById('strength-fill');
+  let score = 0;
+  if (pass.length >= 8)              score++;
+  if (/[A-Z]/.test(pass))            score++;
+  if (/[a-z]/.test(pass))            score++;
+  if (/\d/.test(pass))               score++;
+  if (/[^A-Za-z0-9]/.test(pass))    score++;
+  const pct    = (score / 5) * 100;
+  const colors = ['', '#dc2626', '#f97316', '#eab308', '#22c55e', '#16a34a'];
+  fill.style.width      = pct + '%';
+  fill.style.background = colors[score] || '#dc2626';
+}
+
+async function submitRegister() {
+  hideRegError();
+  const name    = document.getElementById('reg-name').value.trim();
+  const email   = document.getElementById('reg-email').value.trim().toLowerCase();
+  const phone   = document.getElementById('reg-phone').value.trim();
+  const jobTitle  = document.getElementById('reg-jobtitle').value.trim();
+  const empId   = document.getElementById('reg-empid').value.trim();
+  const section = document.getElementById('reg-section').value;
+  const pass    = document.getElementById('reg-pass').value;
+  const confirm = document.getElementById('reg-confirm').value;
+
+  if (!name)    return showRegError('الاسم الكامل مطلوب');
+  if (!email)   return showRegError('البريد الإلكتروني مطلوب');
+  if (!phone)   return showRegError('رقم الجوال مطلوب');
+  if (!section) return showRegError('اختر القسم');
+  if (pass.length < 8) return showRegError('كلمة المرور 8 أحرف على الأقل');
+  if (!/[A-Z]/.test(pass)) return showRegError('يجب أن تحتوي كلمة المرور على حرف كبير');
+  if (!/\d/.test(pass))    return showRegError('يجب أن تحتوي كلمة المرور على رقم');
+  if (pass !== confirm)    return showRegError('كلمة المرور وتأكيدها غير متطابقتين');
+
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جارٍ الإنشاء...';
+
+  try {
+    const res  = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, email, phone,
+        job_title: jobTitle || null,
+        employee_id: empId || null,
+        section_id: section,
+        password: pass,
+        confirm_password: confirm
+      })
+    });
+    const data = await res.json();
+
+    if (!data.success) return showRegError(data.error || 'تعذر إنشاء الحساب');
+
+    showRegSuccess('✅ ' + data.message);
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> تم التسجيل';
+
+    // ننتقل لصفحة تسجيل الدخول بعد ثانيتين ونملأ البريد
+    setTimeout(() => {
+      document.getElementById('email').value = email;
+      showLogin();
+      showSuccess('تم إنشاء حسابك — سجّل دخولك الآن');
+    }, 2200);
+  } catch (e) {
+    showRegError('تعذر الاتصال بالخادم');
+  } finally {
+    btn.disabled = false;
+    if (!btn.innerHTML.includes('تم التسجيل')) {
+      btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> إنشاء الحساب';
+    }
+  }
+}
+// ════════════════════════════════════════════
 </script>
 </body>
 </html>

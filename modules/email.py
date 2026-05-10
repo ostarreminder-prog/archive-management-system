@@ -8,7 +8,7 @@ SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASSWORD")
-FROM_NAME = os.getenv("FROM_NAME", "نجم ⭐")
+FROM_NAME = os.getenv("FROM_NAME", "SignMy")
 
 def send_email(to_email, subject, html_body):
     try:
@@ -37,13 +37,13 @@ def _wrap(content, title, color="#1e40af"):
        style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,{color},{color}dd);padding:28px 32px;text-align:center">
     <div style="font-size:32px;margin-bottom:6px">⭐</div>
-    <div style="color:#fff;font-size:20px;font-weight:700">نجم</div>
+    <div style="color:#fff;font-size:20px;font-weight:700">SignMy</div>
     <div style="color:rgba(255,255,255,.7);font-size:13px;margin-top:4px">{title}</div>
   </td></tr>
   <tr><td style="padding:32px">{content}</td></tr>
   <tr><td style="background:#f9fafb;padding:18px 32px;border-top:1px solid #e5e7eb;text-align:center">
     <div style="color:#9ca3af;font-size:12px">
-      هذا إيميل تلقائي من نظام نجم — لا ترد عليه<br>
+      هذا إيميل تلقائي من نظام SignMy — لا ترد عليه<br>
       {datetime.now().strftime('%Y-%m-%d %H:%M')}
     </div>
   </td></tr>
@@ -54,7 +54,7 @@ def send_welcome(to_email, name, temp_password, role):
     role_ar = {"user": "موظف", "manager": "مدير", "admin": "مدير عام"}.get(role, role)
     content = f"""
     <p style="color:#374151;font-size:15px">مرحباً <strong>{name}</strong> 👋</p>
-    <p style="color:#6b7280;font-size:14px">تم إنشاء حسابك في نظام <strong>نجم ⭐</strong></p>
+    <p style="color:#6b7280;font-size:14px">تم إنشاء حسابك في نظام <strong>SignMy</strong></p>
     <table width="100%" style="background:#eff6ff;border-radius:10px;padding:18px;margin:16px 0">
       <tr><td style="padding:6px 0">
         <span style="color:#6b7280;font-size:13px">📧 البريد الإلكتروني:</span>
@@ -75,7 +75,7 @@ def send_welcome(to_email, name, temp_password, role):
         🔒 لا تشارك هذا الباسورد مع أحد
       </p>
     </div>"""
-    return send_email(to_email, "⭐ مرحباً بك في نجم — بيانات حسابك", _wrap(content, "حساب جديد"))
+    return send_email(to_email, "مرحباً بك في SignMy — بيانات حسابك", _wrap(content, "حساب جديد"))
 
 # ─── 2. OTP ──────────────────────────────────
 def send_otp(to_email, name, code):
@@ -91,7 +91,7 @@ def send_otp(to_email, name, code):
         🔒 لا تشارك هذا الكود مع أحد
       </p>
     </div>"""
-    return send_email(to_email, "🔐 كود تسجيل الدخول — نجم", _wrap(content, "كود التحقق"))
+    return send_email(to_email, "🔐 كود تسجيل الدخول — SignMy", _wrap(content, "كود التحقق"))
 
 # ─── 3. إشعار استخدام التوقيع ────────────────
 def send_sign_used(to_email, name, doc_title, archive_num, serial, used_by,
@@ -200,7 +200,7 @@ def send_weekly_password(to_email, name, new_password):
         ⚠️ هذا الرقم سري — لا تشاركه مع أحد
       </p>
     </div>"""
-    return send_email(to_email, "🔁 تحديث الرقم السري الأسبوعي — نجم", _wrap(content, "التحديث الأسبوعي", "#1e40af"))
+    return send_email(to_email, "🔁 تحديث الرقم السري الأسبوعي — SignMy", _wrap(content, "التحديث الأسبوعي", "#1e40af"))
 
 # ─── 7. جهاز جديد غير مسجل ───────────────────
 def send_new_device(to_email, name, device_name, ip, confirm_url, deny_url):
@@ -264,6 +264,6 @@ def send_new_device(to_email, name, device_name, ip, confirm_url, deny_url):
     </div>"""
     return send_email(
         to_email,
-        "⚠️ تسجيل دخول من جهاز جديد — نجم",
+        "⚠️ تسجيل دخول من جهاز جديد — SignMy",
         _wrap(content, "تنبيه أمني — جهاز جديد", "#b45309")
     )

@@ -250,7 +250,7 @@ def init_db():
         user_id     INTEGER NOT NULL,
         stamp_name  TEXT,
         stamp_path  TEXT NOT NULL,
-        visibility_scope TEXT DEFAULT 'all',
+        visibility_scope TEXT DEFAULT 'self',
         visible_to_user_id INTEGER,
         is_active   INTEGER DEFAULT 1,
         created_at  TEXT DEFAULT (datetime('now')),
@@ -259,19 +259,20 @@ def init_db():
 
     stamp_asset_columns = {row[1] for row in c.execute("PRAGMA table_info(stamp_assets)").fetchall()}
     if 'visibility_scope' not in stamp_asset_columns:
-        c.execute("ALTER TABLE stamp_assets ADD COLUMN visibility_scope TEXT DEFAULT 'all'")
+        c.execute("ALTER TABLE stamp_assets ADD COLUMN visibility_scope TEXT DEFAULT 'self'")
     if 'visible_to_user_id' not in stamp_asset_columns:
         c.execute("ALTER TABLE stamp_assets ADD COLUMN visible_to_user_id INTEGER")
 
-    c.execute("UPDATE stamp_assets SET visibility_scope='all' WHERE TRIM(COALESCE(visibility_scope,''))='' OR visibility_scope IS NULL")
-    c.execute("UPDATE stamp_assets SET visibility_scope='all' WHERE visibility_scope NOT IN ('all','managers','specific','self')")
+    # تصحيح السجلات القديمة التي كانت visibility_scope=NULL أو فارغة فقط (دون تغيير القيم الصحيحة)
+    c.execute("UPDATE stamp_assets SET visibility_scope='self' WHERE TRIM(COALESCE(visibility_scope,''))='' OR visibility_scope IS NULL")
+    c.execute("UPDATE stamp_assets SET visibility_scope='self' WHERE visibility_scope NOT IN ('all','managers','specific','self')")
 
     c.execute('''CREATE TABLE IF NOT EXISTS signature_assets (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id         INTEGER NOT NULL,
         signature_name  TEXT,
         signature_path  TEXT NOT NULL,
-        visibility_scope TEXT DEFAULT 'all',
+        visibility_scope TEXT DEFAULT 'self',
         visible_to_user_id INTEGER,
         is_active       INTEGER DEFAULT 1,
         created_at      TEXT DEFAULT (datetime('now')),
@@ -280,12 +281,13 @@ def init_db():
 
     signature_asset_columns = {row[1] for row in c.execute("PRAGMA table_info(signature_assets)").fetchall()}
     if 'visibility_scope' not in signature_asset_columns:
-        c.execute("ALTER TABLE signature_assets ADD COLUMN visibility_scope TEXT DEFAULT 'all'")
+        c.execute("ALTER TABLE signature_assets ADD COLUMN visibility_scope TEXT DEFAULT 'self'")
     if 'visible_to_user_id' not in signature_asset_columns:
         c.execute("ALTER TABLE signature_assets ADD COLUMN visible_to_user_id INTEGER")
 
-    c.execute("UPDATE signature_assets SET visibility_scope='all' WHERE TRIM(COALESCE(visibility_scope,''))='' OR visibility_scope IS NULL")
-    c.execute("UPDATE signature_assets SET visibility_scope='all' WHERE visibility_scope NOT IN ('all','managers','specific','self')")
+    # تصحيح السجلات القديمة التي كانت visibility_scope=NULL أو فارغة فقط
+    c.execute("UPDATE signature_assets SET visibility_scope='self' WHERE TRIM(COALESCE(visibility_scope,''))='' OR visibility_scope IS NULL")
+    c.execute("UPDATE signature_assets SET visibility_scope='self' WHERE visibility_scope NOT IN ('all','managers','specific','self')")
 
     c.execute('''CREATE TABLE IF NOT EXISTS app_settings (
         setting_key   TEXT PRIMARY KEY,

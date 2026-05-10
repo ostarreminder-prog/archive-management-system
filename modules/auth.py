@@ -358,7 +358,7 @@ def get_all_users():
         """
         SELECT u.id, u.name, u.email, u.phone, u.job_title, u.role,
                u.signature_path, u.stamp_text, u.created_at, u.is_active,
-               u.archive_section_id, u.employee_id,
+               u.archive_section_id, u.employee_id, u.created_by,
                s.section_name AS archive_section,
                s.section_code AS archive_section_code
         FROM users u

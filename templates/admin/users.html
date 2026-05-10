@@ -38,6 +38,12 @@
     style="background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;cursor:pointer">
     <option value="">كل الأقسام</option>
   </select>
+  <select id="selfreg-filter" onchange="renderUsers()"
+    style="background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;outline:none;cursor:pointer">
+    <option value="">الكل</option>
+    <option value="self">تسجيل ذاتي فقط</option>
+    <option value="admin">أضافهم الأدمن فقط</option>
+  </select>
   <button class="btn-ghost" onclick="openSectionModal('new')"><i class="fa-solid fa-folder-plus"></i> قسم جديد</button>
 </div>
 
@@ -95,7 +101,7 @@
       </div>
       <div class="mfield" id="stamp-field" style="grid-column:1/-1;display:none">
         <label>نص الختم الرسمي</label>
-        <input type="text" id="n-stamp" placeholder="مدير المبيعات — شركة النجم">
+        <input type="text" id="n-stamp" placeholder="مدير المبيعات — شركة SignMy">
       </div>
     </div>
     <div style="margin-top:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:10px">
@@ -153,7 +159,7 @@
       </div>
       <div class="mfield" style="grid-column:1/-1">
         <label>نص الختم (اتركه فارغاً إذا لا يوجد ختم)</label>
-        <input type="text" id="e-stamp" placeholder="مدير المبيعات — شركة النجم">
+        <input type="text" id="e-stamp" placeholder="مدير المبيعات — شركة SignMy">
       </div>
     </div>
     <div style="margin-top:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:10px">
@@ -273,11 +279,14 @@ function renderUsers(){
   const q    = document.getElementById('search').value.toLowerCase();
   const role = document.getElementById('role-filter').value;
   const sectionId = document.getElementById('section-filter').value;
-  const list = allUsers.filter(u=>
-    (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || String(u.archive_section||'').toLowerCase().includes(q) || String(u.archive_section_code||'').toLowerCase().includes(q)) &&
+  const selfregF  = document.getElementById('selfreg-filter').value;
+  const list = allUsers.filter(u=>{
+    const selfReg = (u.created_by === null || u.created_by === undefined);
+    return (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || String(u.archive_section||'').toLowerCase().includes(q) || String(u.archive_section_code||'').toLowerCase().includes(q)) &&
     (!role || u.role===role) &&
-    (!sectionId || String(u.archive_section_id || '') === String(sectionId))
-  );
+    (!sectionId || String(u.archive_section_id || '') === String(sectionId)) &&
+    (!selfregF || (selfregF==='self' ? selfReg : !selfReg));
+  });
   const el = document.getElementById('users-table');
   if(!list.length){
     el.innerHTML='<div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><div class="empty-text">لا توجد نتائج</div></div>';
@@ -285,12 +294,15 @@ function renderUsers(){
   }
   el.innerHTML=`<table>
     <thead><tr><th>المستخدم</th><th>الرقم الوظيفي</th><th>الدور</th><th>القسم</th><th>الجوال</th><th>المسمى</th><th>الختم</th><th>الحالة</th><th></th></tr></thead>
-    <tbody>${list.map(u=>`<tr>
+    <tbody>${list.map(u=>{
+      const selfReg = (u.created_by === null || u.created_by === undefined);
+      const rowStyle = selfReg ? 'background:rgba(166,90,42,.04);' : '';
+      return `<tr style="${rowStyle}">
       <td>
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#b7791f);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${u.name[0]}</div>
           <div>
-            <div style="font-weight:600;font-size:13px">${u.name}</div>
+            <div style="font-weight:600;font-size:13px">${u.name}${selfReg ? ' <span style="font-size:9px;background:rgba(166,90,42,.15);color:var(--accent);border:1px solid rgba(166,90,42,.3);border-radius:4px;padding:1px 5px;vertical-align:middle">تسجيل ذاتي</span>' : ''}</div>
             <div style="font-size:11px;color:var(--text3)">${u.email}</div>
           </div>
         </div>
@@ -305,11 +317,13 @@ function renderUsers(){
       <td>
         <div style="display:flex;gap:6px">
           <button class="btn-ghost" onclick='editUser(${JSON.stringify(u)})'>تعديل</button>
-          ${u.is_active ? `<button class="btn-danger" onclick="deactivateUser(${u.id},${JSON.stringify(u.name)})">إيقاف</button>` : ''}
+          ${u.is_active
+            ? `<button class="btn-danger" onclick="deactivateUser(${u.id},${JSON.stringify(u.name)})">إيقاف</button>`
+            : `<button class="btn-ghost" style="color:#16a34a;border-color:#16a34a" onclick="activateUser(${u.id},${JSON.stringify(u.name)})">تفعيل</button>`}
           <button class="btn-danger" style="background:#7f1d1d" onclick="permanentDeleteUser(${u.id},${JSON.stringify(u.name)})">حذف نهائي</button>
         </div>
       </td>
-    </tr>`).join('')}
+    </tr>`;}).join('')}
     </tbody></table>`;
 }
 
@@ -363,7 +377,13 @@ async function createUser(){
   const data = await res.json();
   if(data.success){
     closeModal('new-modal');
-    toast(data.message);
+    // عرض كلمة المرور المؤقتة للمشرف بدل إرسالها بالإيميل
+    if(data.temp_password){
+      const msg = `تم إنشاء الحساب بنجاح.\n\nكلمة المرور المؤقتة:\n${data.temp_password}\n\nسلّمها للموظف يدوياً.`;
+      alert(msg);
+    } else {
+      toast(data.message || 'تم الإنشاء');
+    }
     ['n-name','n-email','n-phone','n-job','n-empid','n-stamp'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('n-section').value='';
     // reset checkboxes
@@ -465,6 +485,14 @@ async function deactivateUser(id, name){
   const data = await res.json();
   if(data.success){ toast('تم إيقاف المستخدم'); loadUsers(); }
   else toast(data.error||'فشل الإيقاف','error');
+}
+
+async function activateUser(id, name){
+  if(!confirm(`تفعيل حساب ${name}؟`)) return;
+  const res  = await fetch(`/api/users/${id}/activate`,{method:'POST'});
+  const data = await res.json();
+  if(data.success){ toast('تم تفعيل المستخدم'); loadUsers(); }
+  else toast(data.error||'فشل التفعيل','error');
 }
 
 async function permanentDeleteUser(id, name){

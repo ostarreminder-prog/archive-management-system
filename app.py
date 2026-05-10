@@ -517,9 +517,24 @@ def _decorate_doc(conn, doc):
     is_privileged = role in ('admin', 'manager', 'sys_admin')
     is_owner = bool(uid and uid == doc.get('created_by'))
 
+    # التوقيع المباشر: admin/sys_admin دائمًا، manager فقط إذا كان لديه can_stamp=1 في قسم الوثيقة
+    can_sign = False
+    if role in ('admin', 'sys_admin'):
+        can_sign = True
+    elif role == 'manager' and uid:
+        section_code = doc.get('archive_section_code') or ''
+        perm_row = conn.execute(
+            """SELECT 1 FROM user_section_permissions usp
+               JOIN archive_sections s ON s.id = usp.section_id
+               WHERE usp.user_id=? AND s.section_code=? AND usp.can_stamp=1
+               LIMIT 1""",
+            (uid, section_code)
+        ).fetchone()
+        can_sign = bool(perm_row)
+
     doc['needs_sign'] = bool(pending_sign)
     doc['pending_sign_request_id'] = pending_sign['id'] if pending_sign else None
-    doc['can_sign_direct'] = bool(doc.get('status') != 'approved' and (is_privileged or is_owner))
+    doc['can_sign_direct'] = bool(doc.get('status') != 'approved' and can_sign)
     doc['can_delete'] = bool(uid and (is_owner or is_privileged))
     doc['can_edit_text'] = bool(
         uid
@@ -547,7 +562,7 @@ def _svg_placeholder(text_lines, width=1000, height=1400, subtitle="معاينة
     <svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' viewBox='0 0 {width} {height}'>
       <rect width='100%' height='100%' fill='#f8fafc'/>
       <rect x='48' y='48' width='{width-96}' height='{height-96}' rx='16' ry='16' fill='white' stroke='#cbd5e1' stroke-width='2'/>
-      <text x='50%' y='130' text-anchor='middle' fill='#1e40af' font-size='44' font-family='Arial' font-weight='700'>نجم</text>
+      <text x='50%' y='130' text-anchor='middle' fill='#1e40af' font-size='44' font-family='Arial' font-weight='700'>SignMy</text>
       <text x='50%' y='178' text-anchor='middle' fill='#64748b' font-size='24' font-family='Arial'>{safe_subtitle}</text>
       {line_markup}
     </svg>
@@ -1188,7 +1203,7 @@ def _render_stamp_from_tpl(file_name, text_x_ratio=0.25, text_y_ratio=0.08,
         return None
 
 
-def _manager_round_stamp_to_data_uri(company_name='شركة نجم', section_code='', employee_id='', serial_short=''):
+def _manager_round_stamp_to_data_uri(company_name='شركة SignMy', section_code='', employee_id='', serial_short=''):
     """
     ختم دائري رسمي للمديرين يشبه الختم التجاري:
     - النص العلوي الدائري:  company_name
@@ -1200,7 +1215,7 @@ def _manager_round_stamp_to_data_uri(company_name='شركة نجم', section_cod
     sec  = html.escape(str(section_code  or '').strip().upper())
     emp  = html.escape(str(employee_id   or '').strip())
     ser  = html.escape(str(serial_short  or '').strip())
-    co   = html.escape(str(company_name  or 'شركة نجم').strip())
+    co   = html.escape(str(company_name  or 'شركة SignMy').strip())
 
     # mid-line label
     mid_label = sec
@@ -3818,6 +3833,133 @@ def logout():
     return redirect(url_for('login'))
 
 
+# ════════════════════════════════════════════
+# SELF REGISTRATION
+# ════════════════════════════════════════════
+
+# --- بسيط: تحديد معدل التسجيل لكل IP ---
+import time as _time
+_reg_rate: dict = {}          # ip -> [timestamp, ...]
+_reg_rate_lock = threading.Lock()
+_REG_WINDOW = 3600            # ساعة واحدة
+_REG_MAX    = 5               # أقصى 5 محاولات في الساعة
+
+def _check_reg_rate(ip: str) -> bool:
+    """True = مسموح، False = تجاوز الحد."""
+    now = _time.time()
+    with _reg_rate_lock:
+        stamps = [t for t in _reg_rate.get(ip, []) if now - t < _REG_WINDOW]
+        if len(stamps) >= _REG_MAX:
+            _reg_rate[ip] = stamps
+            return False
+        stamps.append(now)
+        _reg_rate[ip] = stamps
+    return True
+
+
+@app.route("/api/register/sections", methods=["GET"])
+def api_register_sections():
+    """أقسام الأرشيف النشطة — عامة بلا مصادقة لصفحة التسجيل."""
+    sections = get_all_archive_sections(include_inactive=False)
+    return jsonify({"success": True, "sections": sections})
+
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    """تسجيل ذاتي للموظف — الدور user تلقائياً، بدون صلاحية admin."""
+    ip = request.remote_addr or "unknown"
+
+    if not _check_reg_rate(ip):
+        return jsonify({"success": False,
+                        "error": "تجاوزت الحد المسموح به من محاولات التسجيل، حاول مجدداً بعد ساعة"}), 429
+
+    data = request.get_json(silent=True) or {}
+
+    # ── استخراج الحقول ──────────────────────
+    name        = str(data.get("name", "") or "").strip()
+    email       = str(data.get("email", "") or "").strip().lower()
+    phone       = str(data.get("phone", "") or "").strip()
+    job_title   = str(data.get("job_title", "") or "").strip() or None
+    employee_id = str(data.get("employee_id", "") or "").strip() or None
+    section_id  = data.get("section_id")
+    password    = str(data.get("password", "") or "")
+    confirm     = str(data.get("confirm_password", "") or "")
+
+    # ── تحقق من الحقول المطلوبة ─────────────
+    if not name:
+        return jsonify({"success": False, "error": "الاسم مطلوب"}), 400
+    if len(name) < 2 or len(name) > 100:
+        return jsonify({"success": False, "error": "الاسم يجب أن يكون بين 2 و100 حرف"}), 400
+    if not re.fullmatch(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$', email):
+        return jsonify({"success": False, "error": "البريد الإلكتروني غير صالح"}), 400
+    if not phone:
+        return jsonify({"success": False, "error": "رقم الجوال مطلوب"}), 400
+    if not re.fullmatch(r'^[\d\s\+\-]{7,20}$', phone):
+        return jsonify({"success": False, "error": "رقم الجوال غير صالح"}), 400
+    if not section_id:
+        return jsonify({"success": False, "error": "اختر القسم"}), 400
+    try:
+        section_id = int(section_id)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "القسم غير صالح"}), 400
+    if len(password) < 8:
+        return jsonify({"success": False, "error": "كلمة المرور يجب أن تكون 8 أحرف على الأقل"}), 400
+    if not re.search(r'[A-Z]', password):
+        return jsonify({"success": False, "error": "كلمة المرور يجب أن تحتوي على حرف كبير على الأقل"}), 400
+    if not re.search(r'\d', password):
+        return jsonify({"success": False, "error": "كلمة المرور يجب أن تحتوي على رقم على الأقل"}), 400
+    if password != confirm:
+        return jsonify({"success": False, "error": "كلمة المرور وتأكيدها غير متطابقتين"}), 400
+
+    # ── تحقق من وجود القسم ──────────────────
+    conn = get_db()
+    try:
+        sec_row = conn.execute(
+            "SELECT id FROM archive_sections WHERE id=? AND is_active=1 LIMIT 1",
+            (section_id,)
+        ).fetchone()
+        if not sec_row:
+            return jsonify({"success": False, "error": "القسم المختار غير موجود"}), 400
+
+        # ── تحقق من تكرار البريد ────────────
+        existing = conn.execute(
+            "SELECT id FROM users WHERE LOWER(email)=?", (email,)
+        ).fetchone()
+        if existing:
+            return jsonify({"success": False,
+                            "error": "هذا البريد الإلكتروني مسجل مسبقاً"}), 409
+
+        # ── إنشاء الحساب ────────────────────
+        conn.execute(
+            """INSERT INTO users
+               (name, email, phone, job_title, role, password_hash,
+                first_login, created_by, archive_section_id, employee_id)
+               VALUES (?,?,?,?,?,?,0,NULL,?,?)""",
+            (name, email, phone, job_title, "user",
+             hash_password(password), section_id, employee_id)
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    finally:
+        conn.close()
+
+    # ── سجّل العملية ────────────────────────
+    log_action(new_id, "SELF_REGISTER",
+               f"تسجيل ذاتي | IP:{ip}", ip=ip,
+               user_agent=request.user_agent.string)
+
+    # ── إيميل ترحيب (اختياري — لن يوقف التسجيل إن فشل) ─
+    try:
+        user_obj = get_user_by_id(new_id)
+        if user_obj:
+            send_welcome(user_obj['email'], user_obj['name'], password)
+    except Exception:
+        pass
+
+    return jsonify({"success": True,
+                    "message": "تم إنشاء حسابك بنجاح، يمكنك الآن تسجيل الدخول"})
+
+
 @app.route("/api/qr/<serial>")
 def api_qr(serial):
     qr_payload = _build_qr_payload(serial_text=serial)
@@ -4071,6 +4213,9 @@ def _build_sign_page_payload(doc, req=None):
         default_stamp_asset_id = preferred_text_stamp.get('asset_id')
         default_stamp_owner_id = preferred_text_stamp.get('owner_id')
 
+    # الملفات المرفوعة: توقيع/ختم فقط بدون QR
+    is_uploaded_file = bool(doc.get('file_path'))
+
     return {
         "doc": doc,
         "req": req,
@@ -4079,7 +4224,7 @@ def _build_sign_page_payload(doc, req=None):
         "stamp_assets": stamp_assets,
         "signature_visibility_targets": signature_visibility_targets,
         "stamp_visibility_targets": stamp_visibility_targets,
-        "allow_qr_option": True,
+        "allow_qr_option": not is_uploaded_file,
         "default_signature_asset_id": default_signature_asset_id,
         "default_stamp_asset_id": default_stamp_asset_id,
         "default_stamp_owner_id": default_stamp_owner_id,
@@ -4123,10 +4268,31 @@ def sign_request_page(req_id):
 @app.route("/sign/doc/<int:doc_id>")
 @login_required
 def sign_document_page(doc_id):
+    role = (session.get('user_role') or '').lower()
+    uid  = session.get('user_id')
     conn = get_db()
-    doc = conn.execute("SELECT * FROM documents WHERE id=? LIMIT 1", (doc_id,)).fetchone()
-    conn.close()
+    doc  = conn.execute("SELECT * FROM documents WHERE id=? LIMIT 1", (doc_id,)).fetchone()
     if not doc:
+        conn.close()
+        return redirect(url_for('documents_page'))
+
+    # التحقق من الصلاحية قبل عرض الصفحة
+    can_sign = False
+    if role in ('admin', 'sys_admin'):
+        can_sign = True
+    elif role == 'manager' and uid:
+        section_code = (doc['archive_section_code'] or '')
+        perm = conn.execute(
+            """SELECT 1 FROM user_section_permissions usp
+               JOIN archive_sections s ON s.id = usp.section_id
+               WHERE usp.user_id=? AND s.section_code=? AND usp.can_stamp=1
+               LIMIT 1""",
+            (uid, section_code)
+        ).fetchone()
+        can_sign = bool(perm)
+    conn.close()
+
+    if not can_sign:
         return redirect(url_for('documents_page'))
 
     payload = _build_sign_page_payload(dict(doc), None)
@@ -4421,6 +4587,19 @@ def admin_users():
 def api_get_users():
     return jsonify(get_all_users())
 
+
+@app.route("/api/admin/self-registered-count", methods=["GET"])
+@login_required
+@role_required("admin", "sys_admin")
+def api_self_registered_count():
+    """عدد الموظفين الذين سجّلوا بأنفسهم ولم يُراجَعوا بعد."""
+    conn = get_db()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE created_by IS NULL AND is_active=1"
+    ).fetchone()[0]
+    conn.close()
+    return jsonify({"count": count})
+
 @app.route("/api/users/mentions", methods=["GET"])
 @login_required
 def api_users_mentions():
@@ -4711,27 +4890,66 @@ def api_create_user():
         finally:
             conn.close()
 
-        send_welcome(email, name, temp_pass, role)
         log_action(session['user_id'], "CREATE_USER", f"{name} — {email}",
                    ip=request.remote_addr, user_agent=request.user_agent.string)
-        response_message = f"تم إنشاء الحساب وإرسال البيانات لـ {email}"
+        result = {"success": True, "user_id": new_uid, "auto_stamp_created": auto_stamp_created,
+                  "temp_password": temp_pass,
+                  "message": f"تم إنشاء الحساب بنجاح"}
         if str(role or '').strip().lower() in ('manager', 'admin', 'sys_admin') and not auto_stamp_created:
-            response_message += " (تنبيه: لم يتم إنشاء الختم التلقائي لعدم توفر قالب ختم افتراضي)"
-
-        return jsonify({"success": True, "message": response_message, "user_id": new_uid, "auto_stamp_created": auto_stamp_created})
+            result["warning"] = "لم يتم إنشاء الختم التلقائي لعدم توفر قالب ختم افتراضي"
+        return jsonify(result)
     return jsonify({"success": False, "error": err})
 
 @app.route("/api/users/<int:uid>", methods=["DELETE"])
 @login_required
 @role_required("admin", "sys_admin")
 def api_delete_user(uid):
+    """إيقاف (تعطيل) الحساب."""
     if uid == session['user_id']:
-        return jsonify({"success": False, "error": "لا تستطيع حذف حسابك"}), 400
+        return jsonify({"success": False, "error": "لا تستطيع إيقاف حسابك"}), 400
     conn = get_db()
     conn.execute("UPDATE users SET is_active=0 WHERE id=?", (uid,))
     conn.commit(); conn.close()
-    log_action(session['user_id'], "DELETE_USER", f"user_id={uid}", ip=request.remote_addr)
+    log_action(session['user_id'], "DEACTIVATE_USER", f"user_id={uid}", ip=request.remote_addr)
     return jsonify({"success": True})
+
+
+@app.route("/api/users/<int:uid>/activate", methods=["POST"])
+@login_required
+@role_required("admin", "sys_admin")
+def api_activate_user(uid):
+    """إعادة تفعيل حساب موقوف."""
+    if uid == session['user_id']:
+        return jsonify({"success": False, "error": "حسابك نشط بالفعل"}), 400
+    conn = get_db()
+    conn.execute("UPDATE users SET is_active=1 WHERE id=?", (uid,))
+    conn.commit(); conn.close()
+    log_action(session['user_id'], "ACTIVATE_USER", f"user_id={uid}", ip=request.remote_addr)
+    return jsonify({"success": True})
+
+
+@app.route("/api/users/<int:uid>/permanent-delete", methods=["DELETE"])
+@login_required
+@role_required("admin", "sys_admin")
+def api_permanent_delete_user(uid):
+    """حذف نهائي من قاعدة البيانات."""
+    if uid == session['user_id']:
+        return jsonify({"success": False, "error": "لا تستطيع حذف حسابك"}), 400
+    conn = get_db()
+    try:
+        # حذف البيانات المرتبطة أولاً
+        conn.execute("DELETE FROM trusted_devices WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM otp_codes WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM user_section_permissions WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM users WHERE id=?", (uid,))
+        conn.commit()
+        log_action(session['user_id'], "PERMANENT_DELETE_USER", f"user_id={uid}", ip=request.remote_addr)
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        conn.close()
 
 @app.route("/api/users/<int:uid>", methods=["PUT"])
 @login_required
@@ -6231,8 +6449,8 @@ def api_generate_manager_stamps():
             continue
 
         conn.execute(
-            "INSERT INTO stamp_assets (user_id, stamp_name, stamp_path, is_active) VALUES (?,?,?,1)",
-            (uid, 'ختم المدير (تلقائي)', f"uploads/stamps/{fname}")
+            "INSERT INTO stamp_assets (user_id, stamp_name, stamp_path, visibility_scope, is_active) VALUES (?,?,?,?,1)",
+            (uid, 'ختم المدير (تلقائي)', f"uploads/stamps/{fname}", 'self')
         )
         generated += 1
 
@@ -6826,6 +7044,15 @@ def sign_document_pdf(req_id):
 
     include_qr = bool(data.get("include_qr", True))
     doc_id = _safe_int(data.get("doc_id"), 0)
+
+    # للملفات المرفوعة: لا QR بغض النظر عن اختيار المستخدم
+    if doc_id:
+        _qr_conn = get_db()
+        _qr_check_doc = _qr_conn.execute("SELECT file_path FROM documents WHERE id=? LIMIT 1", (doc_id,)).fetchone()
+        _qr_conn.close()
+        if _qr_check_doc and _qr_check_doc['file_path']:
+            include_qr = False
+
     positions = _normalize_sign_positions(data.get("positions"), include_qr=include_qr)
     has_sig_position = any(item.get('type') == 'sig' for item in positions)
     has_stamp_position = any(item.get('type') == 'stamp' for item in positions)
