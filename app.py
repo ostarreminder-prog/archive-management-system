@@ -4979,6 +4979,29 @@ def api_create_user():
         return jsonify(result)
     return jsonify({"success": False, "error": err})
 
+@app.route("/api/users/<int:uid>/permanent-delete", methods=["DELETE"])
+@login_required
+@role_required("admin", "sys_admin")
+def api_permanent_delete_user(uid):
+    """حذف نهائي من قاعدة البيانات."""
+    if uid == session['user_id']:
+        return jsonify({"success": False, "error": "لا تستطيع حذف حسابك"}), 400
+    conn = get_db()
+    try:
+        # حذف البيانات المرتبطة أولاً
+        conn.execute("DELETE FROM trusted_devices WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM otp_codes WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM user_section_permissions WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM users WHERE id=?", (uid,))
+        conn.commit()
+        log_action(session['user_id'], "PERMANENT_DELETE_USER", f"user_id={uid}", ip=request.remote_addr)
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
 @app.route("/api/users/<int:uid>", methods=["DELETE"])
 @login_required
 @role_required("admin", "sys_admin")
@@ -5006,29 +5029,6 @@ def api_activate_user(uid):
     log_action(session['user_id'], "ACTIVATE_USER", f"user_id={uid}", ip=request.remote_addr)
     return jsonify({"success": True})
 
-
-@app.route("/api/users/<int:uid>/permanent-delete", methods=["DELETE"])
-@login_required
-@role_required("admin", "sys_admin")
-def api_permanent_delete_user(uid):
-    """حذف نهائي من قاعدة البيانات."""
-    if uid == session['user_id']:
-        return jsonify({"success": False, "error": "لا تستطيع حذف حسابك"}), 400
-    conn = get_db()
-    try:
-        # حذف البيانات المرتبطة أولاً
-        conn.execute("DELETE FROM trusted_devices WHERE user_id=?", (uid,))
-        conn.execute("DELETE FROM otp_codes WHERE user_id=?", (uid,))
-        conn.execute("DELETE FROM user_section_permissions WHERE user_id=?", (uid,))
-        conn.execute("DELETE FROM users WHERE id=?", (uid,))
-        conn.commit()
-        log_action(session['user_id'], "PERMANENT_DELETE_USER", f"user_id={uid}", ip=request.remote_addr)
-        return jsonify({"success": True})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        conn.close()
 
 @app.route("/api/users/<int:uid>", methods=["PUT"])
 @login_required
