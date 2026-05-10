@@ -254,6 +254,7 @@ def _find_approved_duplicate_document(conn, fingerprint):
     if not normalized:
         return None
 
+    # Check against current file_sha256 (signed files)
     exact = conn.execute(
         """
         SELECT id, title, archive_number, status, file_sha256
@@ -267,12 +268,26 @@ def _find_approved_duplicate_document(conn, fingerprint):
     if exact:
         return dict(exact)
 
+    # Check against original_file_sha256 (unsigned files that were signed)
+    original = conn.execute(
+        """
+        SELECT id, title, archive_number, status, file_sha256, original_file_sha256
+        FROM documents
+        WHERE status='approved' AND LOWER(COALESCE(original_file_sha256, ''))=?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (normalized,)
+    ).fetchone()
+    if original:
+        return dict(original)
+
     legacy_rows = conn.execute(
         """
         SELECT id, title, archive_number, status, file_path, archive_storage_path,
-               content_json, template_name, file_sha256
+               content_json, template_name, file_sha256, original_file_sha256
         FROM documents
-        WHERE status='approved' AND TRIM(COALESCE(file_sha256, ''))=''
+        WHERE status='approved' AND TRIM(COALESCE(file_sha256, ''))='' AND TRIM(COALESCE(original_file_sha256, ''))=''
         ORDER BY id DESC
         """
     ).fetchall()
@@ -5558,12 +5573,12 @@ def api_documents():
             """
             INSERT INTO documents
               (title, archive_number, archive_section, archive_section_code,
-                    file_path, archive_storage_path, content_json, template_name, notes, status, created_by, file_sha256, archived_at)
-                VALUES (?,?,?,?,?,?,?,?,?, 'draft', ?, ?, ?)
+                    file_path, archive_storage_path, content_json, template_name, notes, status, created_by, file_sha256, original_file_sha256, archived_at)
+                VALUES (?,?,?,?,?,?,?,?,?, 'draft', ?, ?, ?, ?)
             """,
             (title, archive_number, archive_section, archive_section_code,
              file_path, archive_storage_path, content_json, text_template_name, note or None,
-                 session['user_id'], document_fingerprint, archived_at)
+                 session['user_id'], document_fingerprint, document_fingerprint, archived_at)
         )
         doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
@@ -7489,6 +7504,80 @@ def sign_document(req_id):
     if not saved_to_storage:
         result["warning"] = "تم التوقيع والاعتماد لكن تعذر رفع الملف إلى الأرشيف"
     return jsonify(result)
+
+@app.route("/api/signature-request/<int:req_id>/forward", methods=["POST"])
+@login_required
+def forward_signature_request(req_id):
+    """إعادة توجيه طلب التوقيع لمستخدم آخر (للمدير فقط)"""
+    data = request.json or {}
+    new_user_id = _safe_int(data.get("user_id"), 0)
+    message = str(data.get("message", '') or '').strip()
+    
+    if new_user_id <= 0:
+        return jsonify({"success": False, "error": "اختر مستخدم أولاً"}), 400
+    
+    uid = session['user_id']
+    role = (session.get('user_role') or '').lower()
+    
+    conn = get_db()
+    
+    # تحقق من الطلب
+    req = conn.execute(
+        "SELECT * FROM signature_requests WHERE id=? AND status='pending'",
+        (req_id,)
+    ).fetchone()
+    
+    if not req:
+        conn.close()
+        return jsonify({"success": False, "error": "الطلب غير موجود أو تم معالجته"}), 404
+    
+    # المدير يقدر يعيد التوجيه للطلبات الموجهة له أو اللي هو أنشأها
+    can_forward = (
+        role in ('admin', 'sys_admin') or
+        req['requested_from'] == uid or
+        req['requested_by'] == uid
+    )
+    
+    if not can_forward:
+        conn.close()
+        return jsonify({"success": False, "error": "غير مصرح بإعادة التوجيه"}), 403
+    
+    # تحقق من المستخدم الجديد
+    new_user = conn.execute(
+        "SELECT id, name, email, is_active FROM users WHERE id=? AND is_active=1",
+        (new_user_id,)
+    ).fetchone()
+    
+    if not new_user:
+        conn.close()
+        return jsonify({"success": False, "error": "المستخدم غير موجود"}), 404
+    
+    # تحديث الطلب
+    old_requester = req['requested_from']
+    conn.execute(
+        """
+        UPDATE signature_requests
+        SET requested_from=?, message=?, signature_owner_id=NULL, stamp_owner_id=NULL
+        WHERE id=?
+        """,
+        (new_user_id, message or 'تم إعادة توجيه الطلب', req_id)
+    )
+    conn.commit()
+    conn.close()
+    
+    # إرسال إشعار للمستخدم الجديد
+    doc = get_db().execute("SELECT title, archive_number FROM documents WHERE id=?", (req['document_id'],)).fetchone()
+    if doc:
+        send_sign_request(
+            new_user['email'],
+            new_user['name'],
+            doc['title'],
+            doc['archive_number'],
+            session.get('user_name', 'مدير'),
+            message or 'تم إعادة توجيه طلب توقيع لك'
+        )
+    
+    return jsonify({"success": True, "message": f"تم إعادة التوجيه لـ {new_user['name']}"})
 
 if __name__ == "__main__":
     init_db()

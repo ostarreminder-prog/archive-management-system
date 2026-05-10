@@ -293,9 +293,28 @@ nav{padding:12px 10px;flex:1;overflow-y:auto;}
   </div>
 </div>
 
+<!-- Forward Modal -->
+<div class="modal-overlay" id="forward-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title"><i class="fa-solid fa-share"></i> إعادة توجيه الطلب</div>
+    <div style="padding:16px 0">
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:12px">اختر المستخدم الجديد للتوقيع:</div>
+      <select id="forward-user-select" class="input-field" style="width:100%;margin-bottom:12px">
+        <option value="">-- اختر مستخدم --</option>
+      </select>
+      <input type="text" id="forward-message" class="input-field" placeholder="ملاحظة (اختياري)" style="width:100%">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeForwardModal()">إلغاء</button>
+      <button class="btn-confirm" onclick="confirmForward()">تأكيد</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let currentSignReqId = null;
 let currentVerifySerial = null;
+let forwardReqId = null;
 
 async function readJsonSafe(res) {
   const contentType = (res.headers.get('content-type') || '').toLowerCase();
@@ -332,9 +351,18 @@ async function loadPendingSigns() {
       return;
     }
 
+    // تحقق من صلاحية المدير لإعادة التوجيه
+    const canForward = {% if session.get('user_role') in ('admin', 'manager', 'sys_admin') %}true{% else %}false{% endif %};
+    
     el.innerHTML = data.map(r => {
       const docTitle = r.title || r.doc_title || 'بدون عنوان';
       const archive = r.archive_number || '—';
+      const forwardBtn = canForward ? `
+        <button class="btn-sign" style="background:linear-gradient(135deg,#f59e0b,#d97706);margin-right:8px" 
+                onclick='openForwardModal(${Number(r.id)}, ${JSON.stringify(docTitle)}, ${JSON.stringify(archive)})'>
+          <i class="fa-solid fa-share"></i> إعادة توجيه
+        </button>
+      ` : '';
       return `
       <div class="sign-request-card">
         <div class="sign-doc-icon"><i class="fa-solid fa-file-lines"></i></div>
@@ -343,9 +371,12 @@ async function loadPendingSigns() {
           <div class="sign-doc-archive">${archive}</div>
           <div class="sign-doc-meta"><i class="fa-solid fa-bell"></i> ${r.requester_name || 'أحد الموظفين'} أرسل لك مستندًا للتوقيع — ${r.serial_number || '—'}</div>
         </div>
-        <a href="/sign/${Number(r.id)}" class="btn-sign" style="text-decoration:none">
-          <i class="fa-solid fa-signature"></i> وقّع الآن
-        </a>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${forwardBtn}
+          <a href="/sign/${Number(r.id)}" class="btn-sign" style="text-decoration:none;text-align:center">
+            <i class="fa-solid fa-signature"></i> وقّع الآن
+          </a>
+        </div>
       </div>
     `;
     }).join('');
@@ -449,9 +480,73 @@ async function confirmSign() {
   }
 }
 
-// إغلاق الـ modal بالضغط على الخلفية
+// ─── دوال إعادة التوجيه ─────────────────────
+async function loadForwardUsers() {
+  const select = document.getElementById('forward-user-select');
+  try {
+    const res = await fetch('/api/users', {headers:{'Accept':'application/json'}});
+    const data = await readJsonSafe(res);
+    if (!res.ok) throw new Error(data.error || 'فشل تحميل المستخدمين');
+    
+    // فلترة المستخدمين النشطين (بدون الأدمن)
+    const users = (data.users || []).filter(u => u.is_active && !['admin','sys_admin'].includes(u.role));
+    select.innerHTML = '<option value="">-- اختر مستخدم --</option>' + 
+      users.map(u => `<option value="${u.id}">${u.name} — ${u.job_title || u.role}</option>`).join('');
+  } catch (err) {
+    select.innerHTML = '<option value="">خطأ في التحميل</option>';
+  }
+}
+
+function openForwardModal(reqId, docTitle, archiveNum) {
+  forwardReqId = reqId;
+  document.getElementById('forward-modal').classList.add('show');
+  document.getElementById('forward-message').value = '';
+  loadForwardUsers();
+}
+
+function closeForwardModal() {
+  document.getElementById('forward-modal').classList.remove('show');
+  forwardReqId = null;
+}
+
+async function confirmForward() {
+  if (!forwardReqId) return;
+  
+  const userId = document.getElementById('forward-user-select').value;
+  const message = document.getElementById('forward-message').value;
+  
+  if (!userId) {
+    alert('اختر مستخدم أولاً');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/signature-request/${forwardReqId}/forward`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+      body: JSON.stringify({user_id: parseInt(userId), message})
+    });
+    
+    const data = await readJsonSafe(res);
+    closeForwardModal();
+    
+    if (res.ok && data.success) {
+      alert(data.message || 'تم إعادة التوجيه');
+      loadPendingSigns();
+    } else {
+      alert(data.error || 'فشل إعادة التوجيه');
+    }
+  } catch (err) {
+    alert(err.message || 'فشل الاتصال');
+  }
+}
+
+// إغلاق الـ modals بالضغط على الخلفية
 document.getElementById('sign-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeSignModal();
+});
+document.getElementById('forward-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeForwardModal();
 });
 document.getElementById('result-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeResultModal();

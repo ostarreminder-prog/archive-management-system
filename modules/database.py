@@ -137,8 +137,14 @@ def init_db():
         approved_by     INTEGER,
         created_at      TEXT DEFAULT (datetime('now')),
         approved_at     TEXT,
+        file_sha256           TEXT,
+        archive_storage_path  TEXT,
+        archived_at           TEXT,
+        archived_by           INTEGER,
+        original_file_sha256  TEXT,
         FOREIGN KEY(created_by) REFERENCES users(id),
-        FOREIGN KEY(approved_by) REFERENCES users(id)
+        FOREIGN KEY(approved_by) REFERENCES users(id),
+        FOREIGN KEY(archived_by) REFERENCES users(id)
     )''')
 
     doc_columns = {row[1] for row in c.execute("PRAGMA table_info(documents)").fetchall()}
@@ -154,6 +160,8 @@ def init_db():
         c.execute("ALTER TABLE documents ADD COLUMN archived_by INTEGER")
     if 'file_sha256' not in doc_columns:
         c.execute("ALTER TABLE documents ADD COLUMN file_sha256 TEXT")
+    if 'original_file_sha256' not in doc_columns:
+        c.execute("ALTER TABLE documents ADD COLUMN original_file_sha256 TEXT")
 
     c.execute("UPDATE documents SET archive_section='عام' WHERE archive_section IS NULL OR TRIM(archive_section)=''")
     c.execute("UPDATE documents SET archive_section_code=UPPER(TRIM(archive_section_code)) WHERE archive_section_code IS NOT NULL")
