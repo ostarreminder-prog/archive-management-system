@@ -4990,13 +4990,16 @@ def api_permanent_delete_user(uid):
         return jsonify({"success": False, "error": "لا تستطيع حذف حسابك"}), 400
     conn = get_db()
     try:
-        # حذف البيانات المرتبطة أولاً
+        # حذف البيانات المرتبطة أولاً (ترتيب مهم بسبب Foreign Keys)
         conn.execute("DELETE FROM trusted_devices WHERE user_id=?", (uid,))
         conn.execute("DELETE FROM otp_codes WHERE user_id=?", (uid,))
         conn.execute("DELETE FROM user_section_permissions WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM stamp_assets WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM signature_assets WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM activity_logs WHERE user_id=?", (uid,))
+        # logs نحذفها في النهاية بعد ما نسجل الحذف نفسه
         conn.execute("DELETE FROM users WHERE id=?", (uid,))
         conn.commit()
-        log_action(session['user_id'], "PERMANENT_DELETE_USER", f"user_id={uid}", ip=request.remote_addr)
         return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
