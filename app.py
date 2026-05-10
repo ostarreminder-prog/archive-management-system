@@ -4996,8 +4996,6 @@ def api_permanent_delete_user(uid):
         conn.execute("DELETE FROM user_section_permissions WHERE user_id=?", (uid,))
         conn.execute("DELETE FROM stamp_assets WHERE user_id=?", (uid,))
         conn.execute("DELETE FROM signature_assets WHERE user_id=?", (uid,))
-        conn.execute("DELETE FROM activity_logs WHERE user_id=?", (uid,))
-        # logs نحذفها في النهاية بعد ما نسجل الحذف نفسه
         conn.execute("DELETE FROM users WHERE id=?", (uid,))
         conn.commit()
         return jsonify({"success": True})
