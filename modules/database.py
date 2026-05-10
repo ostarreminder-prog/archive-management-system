@@ -110,14 +110,15 @@ def init_db():
     )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS trusted_devices (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id     INTEGER NOT NULL,
-        device_hash TEXT NOT NULL,
-        device_name TEXT,
-        ip_address  TEXT,
-        trusted     INTEGER DEFAULT 0,
-        token       TEXT UNIQUE,
-        created_at  TEXT DEFAULT (datetime('now')),
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id              INTEGER NOT NULL,
+        device_hash          TEXT NOT NULL,
+        device_name          TEXT,
+        ip_address           TEXT,
+        trusted              INTEGER DEFAULT 0,
+        token                TEXT UNIQUE,
+        last_otp_verified_at TEXT,
+        created_at           TEXT DEFAULT (datetime('now')),
         FOREIGN KEY(user_id) REFERENCES users(id)
     )''')
 
@@ -185,6 +186,11 @@ def init_db():
             "UPDATE users SET archive_section_id=? WHERE archive_section_id IS NULL",
             (default_section_id,)
         )
+
+    # Migration: add last_otp_verified_at to trusted_devices
+    trusted_devices_columns = {row[1] for row in c.execute("PRAGMA table_info(trusted_devices)").fetchall()}
+    if 'last_otp_verified_at' not in trusted_devices_columns:
+        c.execute("ALTER TABLE trusted_devices ADD COLUMN last_otp_verified_at TEXT")
 
     c.execute('''CREATE TABLE IF NOT EXISTS signature_requests (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,

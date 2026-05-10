@@ -3746,7 +3746,40 @@ def login():
             "error":      "تم إرسال إيميل تأكيد للجهاز الجديد — تحقق من بريدك"
         })
 
-    # جهاز موثوق — أرسل OTP
+    # جهاز موثوق — تحقق من وقت آخر OTP
+    conn = get_db()
+    device_row = conn.execute(
+        "SELECT last_otp_verified_at FROM trusted_devices WHERE user_id=? AND device_hash=? AND trusted=1",
+        (user['id'], device_hash)
+    ).fetchone()
+    
+    # إذا آخر OTP أقل من 10 دقايق، ادخل مباشرة
+    skip_otp = False
+    if device_row and device_row['last_otp_verified_at']:
+        try:
+            last_verified = datetime.fromisoformat(device_row['last_otp_verified_at'])
+            if datetime.utcnow() - last_verified < timedelta(minutes=10):
+                skip_otp = True
+        except Exception:
+            pass
+    
+    if skip_otp:
+        # دخول مباشر بدون OTP
+        session.clear()
+        session['user_id']    = user['id']
+        session['user_name']  = user['name']
+        session['user_role']  = user['role']
+        session['user_email'] = user['email']
+        session.permanent     = True
+        log_login(user['id'], "login", ip, ua)
+        log_action(user['id'], "LOGIN", ip=ip, user_agent=ua)
+        conn.close()
+        if user['first_login']:
+            return jsonify({"success": True, "redirect": url_for('change_password_page')})
+        return jsonify({"success": True, "redirect": url_for('dashboard')})
+    
+    conn.close()
+    # جهاز موثوق لكن مر أكثر من 10 دقايق — أرسل OTP
     code = generate_otp(user['id'])
     send_otp(user['email'], user['name'], code)
     session['pending_user_id'] = user['id']
@@ -3801,6 +3834,19 @@ def verify_otp_route():
         return jsonify({"success": False, "error": "الكود غير صحيح أو انتهت صلاحيته"}), 401
 
     user = get_user_by_id(user_id)
+    
+    # تحديث وقت آخر OTP verification
+    ip = request.remote_addr
+    ua = request.user_agent.string
+    device_hash = get_device_hash(ip, ua)
+    conn = get_db()
+    conn.execute(
+        "UPDATE trusted_devices SET last_otp_verified_at=? WHERE user_id=? AND device_hash=? AND trusted=1",
+        (datetime.utcnow().isoformat(), user_id, device_hash)
+    )
+    conn.commit()
+    conn.close()
+    
     session.clear()
     session['user_id']    = user['id']
     session['user_name']  = user['name']
@@ -3808,8 +3854,8 @@ def verify_otp_route():
     session['user_email'] = user['email']
     session.permanent     = True
 
-    log_login(user['id'], "login", request.remote_addr, request.user_agent.string)
-    log_action(user['id'], "LOGIN", ip=request.remote_addr, user_agent=request.user_agent.string)
+    log_login(user['id'], "login", ip, ua)
+    log_action(user['id'], "LOGIN", ip=ip, user_agent=ua)
 
     if user['first_login']:
         return jsonify({"success": True, "redirect": url_for('change_password_page')})
