@@ -3660,10 +3660,13 @@ def _get_stamp_assets(conn, viewer_id=None, viewer_role=''):
                u.role,
                u.stamp_text,
                u.employee_id,
+               COALESCE(u.stamp_visibility_scope, 'self') AS visibility_scope,
+               u.stamp_visible_to_user_id,
                s.section_code
         FROM users u
         LEFT JOIN archive_sections s ON s.id = u.archive_section_id
         WHERE u.is_active=1
+          AND COALESCE(u.stamp_text, '') != ''
           AND COALESCE(u.role, '') IN ('manager', 'admin', 'sys_admin')
         ORDER BY u.id DESC
         """
@@ -3671,15 +3674,17 @@ def _get_stamp_assets(conn, viewer_id=None, viewer_role=''):
 
     for row in text_rows:
         owner_id = row['owner_id']
-        if not _stamp_visible('self', None, owner_id):
+        scope = row['visibility_scope']
+        visible_to_uid = _safe_int(row.get('stamp_visible_to_user_id'), 0)
+        if not _stamp_visible(scope, visible_to_uid, owner_id):
             continue
         assets.append({
             'asset_id': f"text-{owner_id}",
             'owner_id': owner_id,
             'stamp_name': 'ختم المدير',
             'stamp_path': None,
-            'visibility_scope': 'self',
-            'visible_to_user_id': None,
+            'visibility_scope': scope,
+            'visible_to_user_id': visible_to_uid if visible_to_uid > 0 else None,
             'name': row['name'],
             'role': row['role'],
             'stamp_text': row['stamp_text'],
@@ -4459,6 +4464,80 @@ def api_stamp_asset_visibility(asset_id):
     })
 
 
+@app.route("/api/users/<int:user_id>/stamp-visibility", methods=["POST"])
+@login_required
+def api_text_stamp_visibility(user_id):
+    """Update visibility for text-based stamp (stamp_text column)."""
+    data = request.json or {}
+    visibility_scope = str(data.get('visibility_scope') or 'self').strip().lower()
+    if visibility_scope not in ('all', 'managers', 'specific', 'self'):
+        return jsonify({"success": False, "error": "نطاق الظهور غير صالح"}), 400
+
+    visible_to_user_id = _safe_int(data.get('visible_to_user_id'), 0)
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT id, name, role, stamp_text FROM users WHERE id=? LIMIT 1",
+        (user_id,)
+    ).fetchone()
+
+    if not user:
+        conn.close()
+        return jsonify({"success": False, "error": "المستخدم غير موجود"}), 404
+
+    if not user['stamp_text']:
+        conn.close()
+        return jsonify({"success": False, "error": "لا يوجد ختم نصي لهذا المستخدم"}), 400
+
+    viewer_role = str(session.get('user_role') or '').lower()
+    viewer_id = session.get('user_id')
+    if user['id'] != viewer_id and viewer_role not in ('admin', 'sys_admin'):
+        conn.close()
+        return jsonify({"success": False, "error": "ليس لديك صلاحية تعديل هذا الختم"}), 403
+
+    target_user = None
+    if visibility_scope == 'self':
+        visible_to_user_id = None
+    elif visibility_scope == 'specific':
+        if visible_to_user_id <= 0:
+            conn.close()
+            return jsonify({"success": False, "error": "اختر المستخدم المحدد"}), 400
+        target_user = conn.execute(
+            "SELECT id, name, role FROM users WHERE id=? AND is_active=1 LIMIT 1",
+            (visible_to_user_id,)
+        ).fetchone()
+        if not target_user:
+            conn.close()
+            return jsonify({"success": False, "error": "المستخدم غير موجود"}), 400
+        if str(target_user['role'] or '').lower() not in ('manager', 'admin', 'sys_admin'):
+            conn.close()
+            return jsonify({"success": False, "error": "يمكن التخصيص فقط للمدير أو المدير العام"}), 400
+    else:
+        visible_to_user_id = None
+
+    conn.execute(
+        "UPDATE users SET stamp_visibility_scope=?, stamp_visible_to_user_id=? WHERE id=?",
+        (visibility_scope, visible_to_user_id, user_id)
+    )
+    conn.commit()
+    conn.close()
+
+    visibility_label = {
+        'all': 'جميع المستخدمين',
+        'managers': 'المدراء والمدير العام',
+        'specific': f"مستخدم محدد: {target_user['name']}" if target_user else 'مستخدم محدد',
+        'self': 'لا أحد',
+    }.get(visibility_scope, 'جميع المستخدمين')
+
+    return jsonify({
+        "success": True,
+        "user_id": user_id,
+        "visibility_scope": visibility_scope,
+        "visible_to_user_id": visible_to_user_id,
+        "visibility_label": visibility_label
+    })
+
+
 @app.route("/api/stamp-preview")
 @login_required
 def api_stamp_preview():
@@ -5055,7 +5134,21 @@ def api_set_user_section_perms(uid):
 def profile():
     user    = get_user_by_id(session['user_id'])
     devices = get_trusted_devices(session['user_id'])
-    return render_template("profile.html", user=dict(user), devices=devices)
+    user_dict = dict(user)
+    # Get text stamp visibility
+    conn = get_db()
+    row = conn.execute(
+        "SELECT COALESCE(stamp_visibility_scope, 'self') AS stamp_visibility_scope, stamp_visible_to_user_id FROM users WHERE id=? LIMIT 1",
+        (session['user_id'],)
+    ).fetchone()
+    conn.close()
+    if row:
+        user_dict['stamp_visibility_scope'] = row['stamp_visibility_scope']
+        user_dict['stamp_visible_to_user_id'] = row['stamp_visible_to_user_id']
+    else:
+        user_dict['stamp_visibility_scope'] = 'self'
+        user_dict['stamp_visible_to_user_id'] = None
+    return render_template("profile.html", user=user_dict, devices=devices)
 
 @app.route("/api/profile/signature", methods=["POST"])
 @login_required

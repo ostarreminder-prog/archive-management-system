@@ -93,7 +93,26 @@
       </span>
     </div>
     {% if user.stamp_text %}
-      <div class="info-row"><span class="info-label">نص الختم</span><span class="info-val" style="color:var(--gold)"><i class="fa-solid fa-stamp"></i> {{ user.stamp_text }}</span></div>
+      <div id="text-stamp-container" data-user-id="{{ user.id }}" data-visible-to="{{ user.stamp_visible_to_user_id if user.stamp_visible_to_user_id else '' }}" data-scope="{{ user.stamp_visibility_scope or 'self' }}">
+        <div class="info-row"><span class="info-label">نص الختم</span><span class="info-val" style="color:var(--gold)"><i class="fa-solid fa-stamp"></i> {{ user.stamp_text }}</span></div>
+        <div class="info-row">
+          <span class="info-label">ظهور الختم للمستخدمين</span>
+          <div>
+            <select id="text-stamp-visibility" class="asset-select" style="width:auto;min-width:140px">
+              <option value="self" {{ 'selected' if user.stamp_visibility_scope=='self' else '' }}>لا أحد</option>
+              <option value="all" {{ 'selected' if user.stamp_visibility_scope=='all' else '' }}>جميع المستخدمين</option>
+              <option value="managers" {{ 'selected' if user.stamp_visibility_scope=='managers' else '' }}>المدراء والمدير العام</option>
+              <option value="specific" {{ 'selected' if user.stamp_visibility_scope=='specific' else '' }}>مستخدم محدد...</option>
+            </select>
+            <select id="text-stamp-specific-user" class="asset-select" style="width:auto;min-width:140px;display:none;margin-top:6px">
+              <option value="">اختر المستخدم...</option>
+            </select>
+            <button class="btn-primary" onclick="saveTextStampVisibility()" style="margin-top:8px;font-size:12px;padding:6px 12px">
+              <i class="fa-solid fa-check"></i> حفظ
+            </button>
+          </div>
+        </div>
+      </div>
     {% endif %}
     <div class="info-row"><span class="info-label">تاريخ الانضمام</span><span class="info-val" style="font-size:12px;color:var(--text2)">{{ (user.created_at or '')[:10] }}</span></div>
   </div>
@@ -449,7 +468,64 @@ async function deleteStamp(id){
   }
 }
 
+// Text stamp visibility functions
+let visibilityTargets = [];
+async function loadVisibilityTargets(){
+  try {
+    const res = await fetch('/api/profile/signature-visibility-targets');
+    const data = await res.json();
+    if(data.success){
+      visibilityTargets = data.targets || [];
+      populateSpecificUserDropdown();
+    }
+  } catch(e){}
+}
+
+function populateSpecificUserDropdown(){
+  const select = document.getElementById('text-stamp-specific-user');
+  if(!select) return;
+  const container = document.getElementById('text-stamp-container');
+  const currentUserId = parseInt(container?.dataset?.userId || '0');
+  const options = visibilityTargets
+    .filter(t => t.id !== currentUserId)
+    .map(t => `<option value="${t.id}">${t.name} (${t.role})</option>`).join('');
+  select.innerHTML = '<option value="">اختر المستخدم...</option>' + options;
+  // Set current value if applicable
+  const currentVisibleTo = container?.dataset?.visibleTo || null;
+  if(currentVisibleTo) select.value = currentVisibleTo;
+}
+
+document.getElementById('text-stamp-visibility')?.addEventListener('change', function(){
+  const specificRow = document.getElementById('text-stamp-specific-user');
+  if(specificRow){
+    specificRow.style.display = this.value === 'specific' ? 'block' : 'none';
+    if(this.value === 'specific') loadVisibilityTargets();
+  }
+});
+
+async function saveTextStampVisibility(){
+  const scope = document.getElementById('text-stamp-visibility')?.value || 'self';
+  const targetEl = document.getElementById('text-stamp-specific-user');
+  const targetId = scope==='specific' && targetEl ? parseInt(targetEl.value)||null : null;
+
+  const res = await fetch(`/api/users/{{ user.id }}/stamp-visibility`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({visibility_scope: scope, visible_to_user_id: targetId})
+  });
+  const data = await res.json();
+  if(res.ok && data.success){
+    toast(`تم حفظ ظهور الختم: ${data.visibility_label || _scopeLabel(scope)}`);
+  } else {
+    toast(data.error || 'فشل الحفظ', 'error');
+  }
+}
+
+// Initialize
 loadSignatures();
 loadStamps();
+if(document.getElementById('text-stamp-visibility')?.value === 'specific'){
+  loadVisibilityTargets();
+}
 </script>
 {% endblock %}

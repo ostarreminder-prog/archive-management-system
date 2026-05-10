@@ -82,6 +82,10 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN archive_section_id INTEGER")
     if 'employee_id' not in user_columns:
         c.execute("ALTER TABLE users ADD COLUMN employee_id TEXT")
+    if 'stamp_visibility_scope' not in user_columns:
+        c.execute("ALTER TABLE users ADD COLUMN stamp_visibility_scope TEXT DEFAULT 'self'")
+    if 'stamp_visible_to_user_id' not in user_columns:
+        c.execute("ALTER TABLE users ADD COLUMN stamp_visible_to_user_id INTEGER")
 
     c.execute('''CREATE TABLE IF NOT EXISTS user_section_permissions (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -297,7 +297,8 @@ function renderUsers(){
     <tbody>${list.map(u=>{
       const selfReg = (u.created_by === null || u.created_by === undefined);
       const rowStyle = selfReg ? 'background:rgba(166,90,42,.04);' : '';
-      return `<tr style="${rowStyle}">
+      const safeName = (u.name || '').replace(/["&]/g, '');
+      return `<tr style="${rowStyle}" data-user-id="${u.id}">
       <td>
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#b7791f);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${u.name[0]}</div>
@@ -316,15 +317,21 @@ function renderUsers(){
       <td><span class="badge ${u.is_active?'badge-approved':'badge-rejected'}">${u.is_active?'نشط':'موقوف'}</span></td>
       <td>
         <div style="display:flex;gap:6px">
-          <button class="btn-ghost" onclick='editUser(${JSON.stringify(u)})'>تعديل</button>
+          <button class="btn-ghost" onclick="editUserById(${u.id})">تعديل</button>
           ${u.is_active
-            ? `<button class="btn-danger" onclick="deactivateUser(${u.id},${JSON.stringify(u.name)})">إيقاف</button>`
-            : `<button class="btn-ghost" style="color:#16a34a;border-color:#16a34a" onclick="activateUser(${u.id},${JSON.stringify(u.name)})">تفعيل</button>`}
-          <button class="btn-danger" style="background:#7f1d1d" onclick="permanentDeleteUser(${u.id},${JSON.stringify(u.name)})">حذف نهائي</button>
+            ? `<button class="btn-danger" onclick="deactivateUser(${u.id},'${safeName}')">إيقاف</button>`
+            : `<button class="btn-ghost" style="color:#16a34a;border-color:#16a34a" onclick="activateUser(${u.id},'${safeName}')">تفعيل</button>`}
+          <button class="btn-danger" style="background:#7f1d1d" onclick="permanentDeleteUser(${u.id},'${safeName}')">حذف نهائي</button>
         </div>
       </td>
     </tr>`;}).join('')}
     </tbody></table>`;
+}
+
+function editUserById(userId){
+  const u = allUsers.find(x => x.id === userId);
+  if(!u) return toast('المستخدم غير موجود', 'error');
+  editUser(u);
 }
 
 // إظهار حقل الختم لو المدير
