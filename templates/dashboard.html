@@ -343,9 +343,9 @@ async function loadPendingSigns() {
           <div class="sign-doc-archive">${archive}</div>
           <div class="sign-doc-meta"><i class="fa-solid fa-bell"></i> ${r.requester_name || 'أحد الموظفين'} أرسل لك مستندًا للتوقيع — ${r.serial_number || '—'}</div>
         </div>
-        <button class="btn-sign" onclick='openSignModal(${Number(r.id)}, ${JSON.stringify(docTitle)}, ${JSON.stringify(archive)})'>
+        <a href="/sign/${Number(r.id)}" class="btn-sign" style="text-decoration:none">
           <i class="fa-solid fa-signature"></i> وقّع الآن
-        </button>
+        </a>
       </div>
     `;
     }).join('');
