@@ -3811,12 +3811,20 @@ def login():
         except Exception:
             pass
     
-    # تحديث وقت آخر OTP
-    conn = get_db()
-    conn.execute("UPDATE users SET last_otp_sent_at=? WHERE id=?", 
-                 (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
-    conn.commit()
-    conn.close()
+    # تحديث وقت آخر OTP (مع معالجة خطأ العمود الناقص)
+    try:
+        conn = get_db()
+        conn.execute("UPDATE users SET last_otp_sent_at=? WHERE id=?", 
+                     (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        # العمود قد يكون غير موجود - نستمر بدون تحديث
+        print(f"[WARNING] Could not update last_otp_sent_at: {e}", file=__import__('sys').stderr)
+        try:
+            conn.close()
+        except:
+            pass
     
     code = generate_otp(user['id'])
     send_otp(user['email'], user['name'], code)
