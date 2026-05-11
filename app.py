@@ -3745,93 +3745,93 @@ def login():
                 log_login(user['id'], "failed", ip, ua)
             return jsonify({"success": False, "error": "البريد أو كلمة المرور غير صحيحة"}), 401
 
-    # ── تحقق من الجهاز
-    device_hash = get_device_hash(ip, ua)
+        # ── تحقق من الجهاز
+        device_hash = get_device_hash(ip, ua)
 
-    if not is_trusted_device(user['id'], device_hash):
-        # جهاز جديد — أرسل إيميل تأكيد
-        token, device_name = register_pending_device(user['id'], device_hash, ip, ua)
-        _base      = _get_verify_base_url()
-        confirm_url = f"{_base}/device/confirm/{token}"
-        deny_url    = f"{_base}/device/deny/{token}"
-        send_new_device(user['email'], user['name'], device_name, ip, confirm_url, deny_url)
-        log_login(user['id'], "new_device", ip, ua)
-        return jsonify({
-            "success":    False,
-            "new_device": True,
-            "error":      "تم إرسال إيميل تأكيد للجهاز الجديد — تحقق من بريدك"
-        })
+        if not is_trusted_device(user['id'], device_hash):
+            # جهاز جديد — أرسل إيميل تأكيد
+            token, device_name = register_pending_device(user['id'], device_hash, ip, ua)
+            _base      = _get_verify_base_url()
+            confirm_url = f"{_base}/device/confirm/{token}"
+            deny_url    = f"{_base}/device/deny/{token}"
+            send_new_device(user['email'], user['name'], device_name, ip, confirm_url, deny_url)
+            log_login(user['id'], "new_device", ip, ua)
+            return jsonify({
+                "success":    False,
+                "new_device": True,
+                "error":      "تم إرسال إيميل تأكيد للجهاز الجديد — تحقق من بريدك"
+            })
 
-    # جهاز موثوق — تحقق من وقت آخر OTP
-    conn = get_db()
-    device_row = conn.execute(
-        "SELECT last_otp_verified_at FROM trusted_devices WHERE user_id=? AND device_hash=? AND trusted=1",
-        (user['id'], device_hash)
-    ).fetchone()
-    
-    # إذا آخر OTP أقل من 10 دقايق، ادخل مباشرة
-    skip_otp = False
-    if device_row and device_row['last_otp_verified_at']:
-        try:
-            last_verified = datetime.fromisoformat(device_row['last_otp_verified_at'])
-            if datetime.utcnow() - last_verified < timedelta(minutes=10):
-                skip_otp = True
-        except Exception:
-            pass
-    
-    if skip_otp:
-        # دخول مباشر بدون OTP
-        session.clear()
-        session['user_id']    = user['id']
-        session['user_name']  = user['name']
-        session['user_role']  = user['role']
-        session['user_email'] = user['email']
-        session.permanent     = True
-        log_login(user['id'], "login", ip, ua)
-        log_action(user['id'], "LOGIN", ip=ip, user_agent=ua)
-        conn.close()
-        if user['first_login']:
-            return jsonify({"success": True, "redirect": url_for('change_password_page')})
-        return jsonify({"success": True, "redirect": url_for('dashboard')})
-    
-    conn.close()
-    # جهاز موثوق لكن مر أكثر من 10 دقايق — أرسل OTP (مع rate limiting)
-    
-    # التحقق من Rate Limiting
-    last_sent = user.get('last_otp_sent_at')
-    if last_sent:
-        try:
-            last_dt = datetime.strptime(last_sent, '%Y-%m-%d %H:%M:%S')
-            seconds_since = (datetime.utcnow() - last_dt).total_seconds()
-            if seconds_since < 60:  # دقيقة واحدة
-                remaining = int(60 - seconds_since)
-                return jsonify({
-                    "success": False,
-                    "error": f"يرجى الانتظار {remaining} ثانية قبل طلب كود جديد"
-                }), 429
-        except Exception:
-            pass
-    
-    # تحديث وقت آخر OTP (مع معالجة خطأ العمود الناقص)
-    try:
+        # جهاز موثوق — تحقق من وقت آخر OTP
         conn = get_db()
-        conn.execute("UPDATE users SET last_otp_sent_at=? WHERE id=?", 
-                     (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        # العمود قد يكون غير موجود - نستمر بدون تحديث
-        print(f"[WARNING] Could not update last_otp_sent_at: {e}", file=__import__('sys').stderr)
-        try:
+        device_row = conn.execute(
+            "SELECT last_otp_verified_at FROM trusted_devices WHERE user_id=? AND device_hash=? AND trusted=1",
+            (user['id'], device_hash)
+        ).fetchone()
+        
+        # إذا آخر OTP أقل من 10 دقايق، ادخل مباشرة
+        skip_otp = False
+        if device_row and device_row['last_otp_verified_at']:
+            try:
+                last_verified = datetime.fromisoformat(device_row['last_otp_verified_at'])
+                if datetime.utcnow() - last_verified < timedelta(minutes=10):
+                    skip_otp = True
+            except Exception:
+                pass
+        
+        if skip_otp:
+            # دخول مباشر بدون OTP
+            session.clear()
+            session['user_id']    = user['id']
+            session['user_name']  = user['name']
+            session['user_role']  = user['role']
+            session['user_email'] = user['email']
+            session.permanent     = True
+            log_login(user['id'], "login", ip, ua)
+            log_action(user['id'], "LOGIN", ip=ip, user_agent=ua)
             conn.close()
-        except:
-            pass
-    
-    code = generate_otp(user['id'])
-    send_otp(user['email'], user['name'], code)
-    session['pending_user_id'] = user['id']
-    log_login(user['id'], "otp_sent", ip, ua)
-    return jsonify({"success": True})
+            if user['first_login']:
+                return jsonify({"success": True, "redirect": url_for('change_password_page')})
+            return jsonify({"success": True, "redirect": url_for('dashboard')})
+        
+        conn.close()
+        # جهاز موثوق لكن مر أكثر من 10 دقايق — أرسل OTP (مع rate limiting)
+        
+        # التحقق من Rate Limiting
+        last_sent = user.get('last_otp_sent_at')
+        if last_sent:
+            try:
+                last_dt = datetime.strptime(last_sent, '%Y-%m-%d %H:%M:%S')
+                seconds_since = (datetime.utcnow() - last_dt).total_seconds()
+                if seconds_since < 60:  # دقيقة واحدة
+                    remaining = int(60 - seconds_since)
+                    return jsonify({
+                        "success": False,
+                        "error": f"يرجى الانتظار {remaining} ثانية قبل طلب كود جديد"
+                    }), 429
+            except Exception:
+                pass
+        
+        # تحديث وقت آخر OTP (مع معالجة خطأ العمود الناقص)
+        try:
+            conn = get_db()
+            conn.execute("UPDATE users SET last_otp_sent_at=? WHERE id=?", 
+                         (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            # العمود قد يكون غير موجود - نستمر بدون تحديث
+            print(f"[WARNING] Could not update last_otp_sent_at: {e}", file=__import__('sys').stderr)
+            try:
+                conn.close()
+            except:
+                pass
+        
+        code = generate_otp(user['id'])
+        send_otp(user['email'], user['name'], code)
+        session['pending_user_id'] = user['id']
+        log_login(user['id'], "otp_sent", ip, ua)
+        return jsonify({"success": True})
 
     except Exception as e:
         import sys, traceback
