@@ -484,14 +484,14 @@ async function confirmSign() {
 async function loadForwardUsers() {
   const select = document.getElementById('forward-user-select');
   try {
-    const res = await fetch('/api/users', {headers:{'Accept':'application/json'}});
+    const res = await fetch('/api/users/mentions', {headers:{'Accept':'application/json'}});
     const data = await readJsonSafe(res);
-    if (!res.ok) throw new Error(data.error || 'فشل تحميل المستخدمين');
+    if (!res.ok) throw new Error('فشل تحميل المستخدمين');
     
-    // فلترة المستخدمين النشطين (بدون الأدمن)
-    const users = (data.users || []).filter(u => u.is_active && !['admin','sys_admin'].includes(u.role));
+    const currentUserId = {{ session.get('user_id', 0) }};
+    const users = (Array.isArray(data) ? data : []).filter(u => u.id !== currentUserId && !['admin','sys_admin'].includes(u.role));
     select.innerHTML = '<option value="">-- اختر مستخدم --</option>' + 
-      users.map(u => `<option value="${u.id}">${u.name} — ${u.job_title || u.role}</option>`).join('');
+      users.map(u => `<option value="${u.id}">${u.name} — ${u.role}</option>`).join('');
   } catch (err) {
     select.innerHTML = '<option value="">خطأ في التحميل</option>';
   }
