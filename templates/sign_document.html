@@ -219,7 +219,7 @@
 {% block scripts %}
 <script>
 const DOC_ID  = {{ doc.id }};
-const REQ_ID  = {{ req.id if req else 'null' }};
+const REQ_ID  = {% if req %}{{ req.id }}{% else %}null{% endif %};
 const PAGES   = {{ page_count }};
 const SIGNATURE_ASSETS = {{ signature_assets|tojson }};
 const STAMP_ASSETS = {{ stamp_assets|tojson }};
@@ -234,9 +234,9 @@ let dragging  = null;
 let dragOff   = {x:0,y:0};
 let activePointerId = null;
 let canvasW   = 0, canvasH = 0;
-let selectedSignatureAssetId = {{ default_signature_asset_id if default_signature_asset_id is not none else 'null' }};
-let selectedStampAssetId = {{ default_stamp_asset_id|tojson if default_stamp_asset_id is not none else 'null' }};
-let selectedStampOwnerId = {{ default_stamp_owner_id if default_stamp_owner_id is not none else 'null' }};
+let selectedSignatureAssetId = {% if default_signature_asset_id is not none %}{{ default_signature_asset_id }}{% else %}null{% endif %};
+let selectedStampAssetId = {% if default_stamp_asset_id is not none %}{{ default_stamp_asset_id|tojson }}{% else %}null{% endif %};
+let selectedStampOwnerId = {% if default_stamp_owner_id is not none %}{{ default_stamp_owner_id }}{% else %}null{% endif %};
 
 async function readJsonSafe(res){
   const ct = (res.headers.get('content-type') || '').toLowerCase();
@@ -307,23 +307,63 @@ async function unlockSignPage(){
 
 // ─── تحميل صفحة PDF ──────────────────────────
 async function loadPage(n){
-  const res   = await fetch(`/api/documents/${DOC_ID}/preview?page=${n}`);
-  const blob  = await res.blob();
-  const url   = URL.createObjectURL(blob);
-  const img   = new window.Image();
-  img.onload  = ()=>{
-    const canvas = document.getElementById('pdf-canvas');
-    canvasW = img.width; canvasH = img.height;
-    canvas.width  = canvasW;
-    canvas.height = canvasH;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    document.getElementById('cur-page').textContent = n+1;
-    document.getElementById('btn-prev').disabled = n===0;
-    document.getElementById('btn-next').disabled = n===PAGES-1;
-    renderItems();
-  };
-  img.src = url;
+  const canvas = document.getElementById('pdf-canvas');
+  const ctx = canvas.getContext('2d');
+  
+  // إظهار حالة التحميل
+  ctx.fillStyle = 'var(--card2, #f7f5ef)';
+  ctx.fillRect(0, 0, canvas.width || 800, canvas.height || 1100);
+  ctx.fillStyle = 'var(--text3, #9a7358)';
+  ctx.font = '14px "IBM Plex Sans Arabic", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('جاري تحميل الصفحة...', (canvas.width || 800)/2, (canvas.height || 1100)/2);
+  
+  try {
+    const res = await fetch(`/api/documents/${DOC_ID}/preview?page=${n}`);
+    if (!res.ok) {
+      throw new Error(`فشل تحميل الصفحة: ${res.status}`);
+    }
+    
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('image')) {
+      throw new Error('المعاينة غير متوفرة - الملف قد يكون غير موجود');
+    }
+    
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const img = new window.Image();
+    
+    img.onload = ()=>{
+      canvasW = img.width; canvasH = img.height;
+      canvas.width  = canvasW;
+      canvas.height = canvasH;
+      ctx.drawImage(img, 0, 0);
+      document.getElementById('cur-page').textContent = n+1;
+      document.getElementById('btn-prev').disabled = n===0;
+      document.getElementById('btn-next').disabled = n===PAGES-1;
+      renderItems();
+      URL.revokeObjectURL(url);
+    };
+    
+    img.onerror = ()=>{
+      ctx.fillStyle = 'var(--card2, #f7f5ef)';
+      ctx.fillRect(0, 0, canvas.width || 800, canvas.height || 1100);
+      ctx.fillStyle = '#dc2626';
+      ctx.font = '14px "IBM Plex Sans Arabic", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('تعذر تحميل الصفحة - اضغط F5 لإعادة المحاولة', (canvas.width || 800)/2, (canvas.height || 1100)/2);
+      URL.revokeObjectURL(url);
+    };
+    
+    img.src = url;
+  } catch (err) {
+    ctx.fillStyle = 'var(--card2, #f7f5ef)';
+    ctx.fillRect(0, 0, canvas.width || 800, canvas.height || 1100);
+    ctx.fillStyle = '#dc2626';
+    ctx.font = '14px "IBM Plex Sans Arabic", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('خطأ: ' + err.message, (canvas.width || 800)/2, (canvas.height || 1100)/2);
+  }
 }
 
 function prevPage(){ if(curPage>0){curPage--;loadPage(curPage);} }
