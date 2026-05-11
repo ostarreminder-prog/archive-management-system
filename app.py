@@ -3078,10 +3078,10 @@ def _build_signed_document_file(doc, conn=None):
     
     print(f"[INFO] Building signed file for doc {doc_id}: ext={ext}, has_source={has_uploaded_file}, template={tpl_name}", file=__import__('sys').stderr)
 
-    # ── ملف مرفوع: الأولوية للملف الأصلي وليس الكليشة ──────────────
-    # إذا الموظف رفع ملف PDF/صورة، نستخدم الملف الأصلي ونركب التوقيع فوقه
+    # ── ملف مرفوع: الأولوية للملف الأصلي دائماً ──────────────
+    # إذا الموظف رفع ملف، نستخدم الملف الأصلي ونركب التوقيع فوقه
     # الكليشة تُستخدم فقط للوثائق النصية (بدون ملف مرفوع)
-    if has_uploaded_file and ext in ('pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'):
+    if has_uploaded_file:
         print(f"[INFO] Doc {doc_id} has uploaded file ({ext}), using original file instead of template", file=__import__('sys').stderr)
         # نكمل للأسفل — الكود يتعامل مع PDF والصور مباشرة
         pass
@@ -5918,6 +5918,21 @@ def api_document_download_signed(doc_id):
     doc = dict(row)
     inline = str(request.args.get('inline', '')).lower() in ('1', 'true', 'yes')
     fallback_name = (doc.get('archive_number') or doc.get('title') or f"document-{doc_id}").replace('/', '-')
+
+    # إذا فيه ملف مرفوع وما فيه توقيع، نرجع الملف الأصلي مباشرة
+    source_file = _resolve_document_file_path(doc.get('file_path'))
+    if source_file and os.path.exists(source_file):
+        signed_check_conn = get_db()
+        has_signature = signed_check_conn.execute(
+            "SELECT 1 FROM signature_requests WHERE document_id=? AND status='signed' LIMIT 1", (doc_id,)
+        ).fetchone()
+        signed_check_conn.close()
+        if not has_signature:
+            return send_file(
+                source_file,
+                as_attachment=not inline,
+                download_name=os.path.basename(source_file)
+            )
 
     signed_path = _build_signed_document_file(doc)
     if not signed_path or not os.path.exists(signed_path):
