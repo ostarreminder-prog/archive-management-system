@@ -3798,7 +3798,8 @@ def login():
         # جهاز موثوق لكن مر أكثر من 10 دقايق — أرسل OTP (مع rate limiting)
         
         # التحقق من Rate Limiting
-        last_sent = user['last_otp_sent_at'] if 'last_otp_sent_at' in user.keys() else None
+        user_dict = dict(user)
+        last_sent = user_dict.get('last_otp_sent_at')
         if last_sent:
             try:
                 last_dt = datetime.strptime(last_sent, '%Y-%m-%d %H:%M:%S')
