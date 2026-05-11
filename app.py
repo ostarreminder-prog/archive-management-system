@@ -3794,7 +3794,30 @@ def login():
         return jsonify({"success": True, "redirect": url_for('dashboard')})
     
     conn.close()
-    # جهاز موثوق لكن مر أكثر من 10 دقايق — أرسل OTP
+    # جهاز موثوق لكن مر أكثر من 10 دقايق — أرسل OTP (مع rate limiting)
+    
+    # التحقق من Rate Limiting
+    last_sent = user.get('last_otp_sent_at')
+    if last_sent:
+        try:
+            last_dt = datetime.strptime(last_sent, '%Y-%m-%d %H:%M:%S')
+            seconds_since = (datetime.utcnow() - last_dt).total_seconds()
+            if seconds_since < 60:  # دقيقة واحدة
+                remaining = int(60 - seconds_since)
+                return jsonify({
+                    "success": False,
+                    "error": f"يرجى الانتظار {remaining} ثانية قبل طلب كود جديد"
+                }), 429
+        except Exception:
+            pass
+    
+    # تحديث وقت آخر OTP
+    conn = get_db()
+    conn.execute("UPDATE users SET last_otp_sent_at=? WHERE id=?", 
+                 (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
+    conn.commit()
+    conn.close()
+    
     code = generate_otp(user['id'])
     send_otp(user['email'], user['name'], code)
     session['pending_user_id'] = user['id']

@@ -86,6 +86,8 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN stamp_visibility_scope TEXT DEFAULT 'self'")
     if 'stamp_visible_to_user_id' not in user_columns:
         c.execute("ALTER TABLE users ADD COLUMN stamp_visible_to_user_id INTEGER")
+    if 'last_otp_sent_at' not in user_columns:
+        c.execute("ALTER TABLE users ADD COLUMN last_otp_sent_at TEXT")
 
     c.execute('''CREATE TABLE IF NOT EXISTS user_section_permissions (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
