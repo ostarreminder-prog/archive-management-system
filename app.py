@@ -7298,9 +7298,9 @@ def sign_document_pdf(req_id):
     # للملفات المرفوعة: لا QR بغض النظر عن اختيار المستخدم
     if doc_id:
         _qr_conn = get_db()
-        _qr_check_doc = _qr_conn.execute("SELECT file_path FROM documents WHERE id=? LIMIT 1", (doc_id,)).fetchone()
+        _qr_check_doc = _qr_conn.execute("SELECT file_path, archive_storage_path FROM documents WHERE id=? LIMIT 1", (doc_id,)).fetchone()
         _qr_conn.close()
-        if _qr_check_doc and _qr_check_doc['file_path']:
+        if _qr_check_doc and (_qr_check_doc['file_path'] or _qr_check_doc['archive_storage_path']):
             include_qr = False
 
     positions = _normalize_sign_positions(data.get("positions"), include_qr=include_qr)
