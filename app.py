@@ -3732,17 +3732,18 @@ def login():
     if request.method == "GET":
         return render_template("login.html")
 
-    data     = request.json
-    email    = data.get("email","").strip().lower()
-    password = data.get("password","")
-    ip       = request.remote_addr
-    ua       = request.user_agent.string
+    try:
+        data     = request.json or {}
+        email    = data.get("email","").strip().lower()
+        password = data.get("password","")
+        ip       = request.remote_addr
+        ua       = request.user_agent.string
 
-    user = get_user_by_email(email)
-    if not user or not check_password(password, user['password_hash']):
-        if user:
-            log_login(user['id'], "failed", ip, ua)
-        return jsonify({"success": False, "error": "البريد أو كلمة المرور غير صحيحة"}), 401
+        user = get_user_by_email(email)
+        if not user or not check_password(password, user['password_hash']):
+            if user:
+                log_login(user['id'], "failed", ip, ua)
+            return jsonify({"success": False, "error": "البريد أو كلمة المرور غير صحيحة"}), 401
 
     # ── تحقق من الجهاز
     device_hash = get_device_hash(ip, ua)
@@ -3831,6 +3832,12 @@ def login():
     session['pending_user_id'] = user['id']
     log_login(user['id'], "otp_sent", ip, ua)
     return jsonify({"success": True})
+
+    except Exception as e:
+        import sys, traceback
+        print(f"[LOGIN ERROR] {e}", file=sys.stderr)
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"خطأ في الخادم: {str(e)}"}), 500
 
 # ── تأكيد الجهاز من الإيميل ──────────────────
 @app.route("/device/confirm/<token>")
