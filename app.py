@@ -5974,6 +5974,8 @@ def api_document_preview(doc_id):
 
     doc = dict(row)
     
+    print(f"[PREVIEW] Doc {doc_id}: file_path={doc.get('file_path')}, archive_storage_path={doc.get('archive_storage_path')}, template={doc.get('template_name')}", file=__import__('sys').stderr)
+    
     # ── Try to use signed/built version first if signed ─────────
     # This ensures QR and signatures are visible in preview
     signed_doc_path = None
@@ -5982,16 +5984,18 @@ def api_document_preview(doc_id):
         if signed_version_path and os.path.exists(signed_version_path):
             signed_doc_path = signed_version_path
             resolved_path = signed_version_path
-            print(f"[INFO] Preview using signed document version for doc {doc_id}: {signed_version_path}", file=__import__('sys').stderr)
+            print(f"[PREVIEW] Using signed version for doc {doc_id}: {signed_version_path}", file=__import__('sys').stderr)
         else:
             resolved_path = _resolve_document_file_path(doc.get('file_path'))
             if not resolved_path:
                 resolved_path = _resolve_document_file_path(doc.get('archive_storage_path'))
+            print(f"[PREVIEW] Using original file for doc {doc_id}: {resolved_path}", file=__import__('sys').stderr)
     except Exception as e:
-        print(f"[WARNING] Failed to build signed version for preview doc {doc_id}: {e}", file=__import__('sys').stderr)
+        print(f"[PREVIEW ERROR] Failed to build signed version for doc {doc_id}: {e}", file=__import__('sys').stderr)
         resolved_path = _resolve_document_file_path(doc.get('file_path'))
         if not resolved_path:
             resolved_path = _resolve_document_file_path(doc.get('archive_storage_path'))
+        print(f"[PREVIEW] Fallback path for doc {doc_id}: {resolved_path}", file=__import__('sys').stderr)
 
     # ── For text documents without a file: build temporary PDF ────
     _temp_generated_path = None
