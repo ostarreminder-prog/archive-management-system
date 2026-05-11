@@ -5600,17 +5600,34 @@ def api_documents():
             archived_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
         # ─── إدراج الوثيقة ──────────────────────────────────────────
-        conn.execute(
-            """
-            INSERT INTO documents
-              (title, archive_number, archive_section, archive_section_code,
-                    file_path, archive_storage_path, content_json, template_name, notes, status, created_by, file_sha256, original_file_sha256, archived_at)
-                VALUES (?,?,?,?,?,?,?,?,?, 'draft', ?, ?, ?, ?)
-            """,
-            (title, archive_number, archive_section, archive_section_code,
-             file_path, archive_storage_path, content_json, text_template_name, note or None,
-                 session['user_id'], document_fingerprint, document_fingerprint, archived_at)
-        )
+        try:
+            conn.execute(
+                """
+                INSERT INTO documents
+                  (title, archive_number, archive_section, archive_section_code,
+                        file_path, archive_storage_path, content_json, template_name, notes, status, created_by, file_sha256, original_file_sha256, archived_at)
+                    VALUES (?,?,?,?,?,?,?,?,?, 'draft', ?, ?, ?, ?)
+                """,
+                (title, archive_number, archive_section, archive_section_code,
+                 file_path, archive_storage_path, content_json, text_template_name, note or None,
+                     session['user_id'], document_fingerprint, document_fingerprint, archived_at)
+            )
+        except Exception as e:
+            # إذا العمود ناقص، نحاول بدونه
+            if 'original_file_sha256' in str(e):
+                conn.execute(
+                    """
+                    INSERT INTO documents
+                      (title, archive_number, archive_section, archive_section_code,
+                            file_path, archive_storage_path, content_json, template_name, notes, status, created_by, file_sha256, archived_at)
+                        VALUES (?,?,?,?,?,?,?,?,?, 'draft', ?, ?, ?)
+                    """,
+                    (title, archive_number, archive_section, archive_section_code,
+                     file_path, archive_storage_path, content_json, text_template_name, note or None,
+                         session['user_id'], document_fingerprint, archived_at)
+                )
+            else:
+                raise
         doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
 
