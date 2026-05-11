@@ -3074,13 +3074,19 @@ def _build_signed_document_file(doc, conn=None):
     ext = _get_document_extension(doc)
     source_path = _resolve_document_file_path(doc.get('file_path'))
     tpl_name = str(doc.get('template_name') or '').strip()
+    has_uploaded_file = bool(source_path and os.path.exists(source_path))
     
-    print(f"[INFO] Building signed file for doc {doc_id}: ext={ext}, has_source={bool(source_path)}, template={tpl_name}", file=__import__('sys').stderr)
+    print(f"[INFO] Building signed file for doc {doc_id}: ext={ext}, has_source={has_uploaded_file}, template={tpl_name}", file=__import__('sys').stderr)
 
-    # ── PDF template (كليشة PDF) ─────────────────────────────────────
-    # PRIORITY 1: If PDF template exists, use it (even if there's a file_path)
-    # This ensures signed/stamped documents use the template with all overlays
-    if tpl_name.lower().endswith('.pdf'):
+    # ── ملف مرفوع: الأولوية للملف الأصلي وليس الكليشة ──────────────
+    # إذا الموظف رفع ملف PDF/صورة، نستخدم الملف الأصلي ونركب التوقيع فوقه
+    # الكليشة تُستخدم فقط للوثائق النصية (بدون ملف مرفوع)
+    if has_uploaded_file and ext in ('pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'):
+        print(f"[INFO] Doc {doc_id} has uploaded file ({ext}), using original file instead of template", file=__import__('sys').stderr)
+        # نكمل للأسفل — الكود يتعامل مع PDF والصور مباشرة
+        pass
+    elif tpl_name.lower().endswith('.pdf'):
+        # كليشة PDF — فقط للوثائق النصية بدون ملف مرفوع
         print(f"[INFO] Attempting to build from PDF template for doc {doc_id}", file=__import__('sys').stderr)
         pdf_result = _build_doc_with_pdf_template(doc, conn=conn)
         if pdf_result and os.path.exists(pdf_result):
@@ -3089,7 +3095,7 @@ def _build_signed_document_file(doc, conn=None):
         else:
             print(f"[WARNING] PDF template build failed or returned None for doc {doc_id}", file=__import__('sys').stderr)
 
-    if ext == 'docx' or (not ext and tpl_name and not tpl_name.lower().endswith('.pdf')):
+    if not has_uploaded_file and (ext == 'docx' or (not ext and tpl_name and not tpl_name.lower().endswith('.pdf'))):
         generated_docx = _build_text_document_docx_file(doc, conn=conn)
         if generated_docx and os.path.exists(generated_docx):
             return generated_docx
