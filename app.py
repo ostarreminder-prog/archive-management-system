@@ -3073,6 +3073,8 @@ def _build_signed_document_file(doc, conn=None):
     doc_id = doc.get('id', 'UNKNOWN')
     ext = _get_document_extension(doc)
     source_path = _resolve_document_file_path(doc.get('file_path'))
+    if not source_path:
+        source_path = _resolve_document_file_path(doc.get('archive_storage_path'))
     tpl_name = str(doc.get('template_name') or '').strip()
     has_uploaded_file = bool(source_path and os.path.exists(source_path))
     
@@ -5921,6 +5923,8 @@ def api_document_download_signed(doc_id):
 
     # إذا فيه ملف مرفوع وما فيه توقيع، نرجع الملف الأصلي مباشرة
     source_file = _resolve_document_file_path(doc.get('file_path'))
+    if not source_file:
+        source_file = _resolve_document_file_path(doc.get('archive_storage_path'))
     if source_file and os.path.exists(source_file):
         signed_check_conn = get_db()
         has_signature = signed_check_conn.execute(
