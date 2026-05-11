@@ -6032,11 +6032,16 @@ def api_document_preview(doc_id):
     if not ext and resolved_path and resolved_path.lower().endswith('.pdf'):
         ext = 'pdf'
 
+    print(f"[PREVIEW] Doc {doc_id}: resolved_path={resolved_path}, ext={ext}, exists={os.path.exists(resolved_path) if resolved_path else 'N/A'}", file=__import__('sys').stderr)
+
     if resolved_path and ext in ('png', 'jpg', 'jpeg', 'webp', 'gif'):
+        print(f"[PREVIEW] Doc {doc_id}: serving image directly", file=__import__('sys').stderr)
         return send_file(resolved_path)
 
     if ext == 'pdf':
+        print(f"[PREVIEW] Doc {doc_id}: rendering PDF page {page}", file=__import__('sys').stderr)
         rendered_stream, total_pages = _render_pdf_page_png(resolved_path, page_index=page, scale=1.5)
+        print(f"[PREVIEW] Doc {doc_id}: rendered_stream={'OK' if rendered_stream else 'FAILED'}, total_pages={total_pages}", file=__import__('sys').stderr)
         # تنظيف ملفات PDF المؤقتة بعد تحميلها في الذاكرة
         if _temp_generated_path:
             try:
